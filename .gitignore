@@ -5,3 +5,6 @@ hyundai-verna.jpg
 mercedes-amg-glc-43-coupe.jpg
 img2txt
 img2txt/
+assets/
+__pycache__/
+.env/
