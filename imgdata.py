@@ -30,7 +30,7 @@ dims = 16
 test_batch_num = 1000
 
 x_train = np.zeros((test_batch_num,text_rows,text_cols,3), dtype='uint8')
-y_train = np.zeros((test_batch_num,text_rows * text_cols, dims), dtype='uint8')
+y_train = np.zeros((test_batch_num,text_rows, text_cols, dims), dtype='uint8')
 
 
 
@@ -55,7 +55,8 @@ def load_images():
 def load_labels():
 	for i in range(test_batch_num):
 		labelpath = 'in_' + str(i) + '.png'
-		indices = text_to_ints(labelpath).flatten()
+		# indices = text_to_ints(labelpath).flatten()
+		indices = text_to_ints(labelpath)
 		o_h_indices = np.eye(dims)[indices]
 		y_train[i] = o_h_indices
 	# print(y_train[0].shape)
