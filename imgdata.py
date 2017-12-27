@@ -2,9 +2,9 @@ import os
 import numpy as np 
 from scipy import misc
 from PIL import Image
-import keras
-import keras.preprocessing.text
-import tensorflow as tf 
+# import keras
+# import keras.preprocessing.text
+# import tensorflow as tf 
 
 #On Ubuntu
 #img_data_dir = '/home/nsaftarli/Documents/ascii-art/ASCIIArtNN/assets/rgb_input/img_align_celeba_png/'
@@ -23,9 +23,13 @@ char_dict = {'M':0,'N':1,'H':2,'Q':3,'$':4,'O':5,'C':6,'?':7,'7':8,'>':9,'!':10,
 '''
 Change this on beta. Data of different dimensions
 '''
+samples = 202533
 text_rows = 219
 text_cols = 350
 dims = 16
+
+x_train = np.zeros((samples,text_rows,text_cols,3), dtype='uint8')
+y_train = np.zeros((samples,text_rows*text_cols,dims), dtype='uint8')
 
 
 
@@ -34,7 +38,7 @@ def load_data(image):
 	img = Image.open(tstimg)
 	print(img.size)
 	nparray = np.asarray(img,dtype='uint8')
-	print(nparray.shape)
+	print(nparray)
 	# tstimg = img_data_dir + 'in_0'
 	# face = misc.face()
 	# misc.imsave(tstimg,face)
@@ -44,7 +48,7 @@ def load_data(image):
 
 def text_to_ints(text):
 	textfile = open(ascii_data_dir + text)
-	result = np.zeros((text_rows,text_cols))
+	result = np.zeros((text_rows,text_cols), dtype='uint8')
 	for row,line in enumerate(textfile):
 		if row != text_rows:
 			for col,char  in enumerate(line):
@@ -54,22 +58,16 @@ def text_to_ints(text):
 	print(result)
 	return result
 
-
-	
-def one_hot_encoding(arr,dim):
-	return tf.one_hot(arr,dim)
 	
 
 index_arr = text_to_ints('in_0')
 index_arr = index_arr.flatten()
-o_h_index_arr = tf.one_hot(arr,dim)
-
+o_h_index_arr = np.eye(dims)[index_arr]
+print(o_h_index_arr.shape)
 print(o_h_index_arr)
+load_data('in_0.png')
 
-with tf.Session():
-	print(o_h_index_arr.eval())
 
-# o_h_index_arr = one_hot_encoding(index_arr,dims)
 
 
 
