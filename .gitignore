@@ -8,3 +8,4 @@ img2txt/
 assets/
 __pycache__/
 .env/
+*.pyc
