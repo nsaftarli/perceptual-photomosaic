@@ -3,8 +3,8 @@ import numpy as np
 from PIL import Image
 
 #On Ubuntu
-img_data_dir = '/home/nsaftarli/Documents/ascii-art/ASCIIArtNN/assets/rgb_input/img_align_celeba_png/'
-ascii_data_dir = '/home/nsaftarli/Documents/ascii-art/ASCIIArtNN/assets/ascii_output/'
+img_data_dir = '/home/nsaftarli/Documents/ascii-art/ASCIIArtNN/assets/rgb_in/img_celeba/'
+ascii_data_dir = '/home/nsaftarli/Documents/ascii-art/ASCIIArtNN/assets/ascii_out/'
 
 #On OSX
 # img_data_dir = '/Users/Nariman/Documents/GitHub/ASCIIArtNN/assets/rgb_in/'
@@ -20,8 +20,8 @@ char_dict = {'M':0,'N':1,'H':2,'Q':3,'$':4,'O':5,'C':6,'?':7,'7':8,'>':9,'!':10,
 Change this on beta. Data of different dimensions
 '''
 samples = 202533
-text_rows = 218
-text_cols = 178
+text_rows = 224
+text_cols = 224
 dims = 16
 
 # x_train = np.zeros((samples,text_rows,text_cols,3), dtype='uint8')
@@ -43,54 +43,73 @@ def load_images():
 	# print("Numpy array of image dims are: " + str(nparray.shape))
 
 	for i in range(test_batch_num):
-		imgpath = img_data_dir + 'in_' + str(i) + '.png'
+		imgpath = img_data_dir + 'in_' + str(i) + '.jpg'
 		img = Image.open(imgpath)
 		nparray = np.asarray(img,dtype='uint8')
 		x_train[i] = nparray
+		i += 1
 
 	return x_train
-	# print(x_train.shape)
-	# print(x_train[80].shape)
+
 
 def load_labels():
 	for i in range(test_batch_num):
-		labelpath = 'in_' + str(i) + '.png'
-		# indices = text_to_ints(labelpath).flatten()
+		labelpath = 'in_' + str(i) + '.jpg'
 		indices = text_to_ints(labelpath)
 		o_h_indices = np.eye(dims)[indices]
 		y_train[i] = o_h_indices
-	# print(y_train[0].shape)
 	return y_train
 
 
 def text_to_ints(text):
 	textfile = open(ascii_data_dir + text)
+	# print(textfile)
 	result = np.zeros((text_rows,text_cols), dtype='uint8')
-	for row,line in enumerate(textfile):
-		if row != text_rows:
-			for col,char  in enumerate(line):
-				if char != '\n':
-					result[row,col] = char_dict[char]
+
+	row_index = 0
+	col_index = 0
+	for i,row in enumerate(textfile):
+		for j,col in enumerate(row):
+			result[row_index][col_index] = char_dict[col]
+			col_index += 1
+			if col_index == text_rows:
+				col_index = 0 
+				row_index += 1
 	textfile.close()
-	# print(result)
 	return result
+
+def ints_to_text(arr):
+	txtarr = ''
+	for row,n in enumerate(arr):
+		for col,m in enumerate(n):
+			x = 0
+			for p in m:
+				if p == 1:
+					txtarr += char_array[x]
+				x += 1
+			if col == text_cols -1:
+				txtarr += '\n'
+	return txtarr
+
+
 
 	
 
-# index_arr = text_to_ints('in_0.png')
-# index_arr = index_arr.flatten()
-# o_h_index_arr = np.eye(dims)[index_arr]
-# print("One hot array of one sample is: " + str(o_h_index_arr.shape))
-# print(o_h_index_arr)
-# load_data('in_0.png')
+index_arr = text_to_ints('in_0.jpg')
+o_h_index_arr = np.eye(dims)[index_arr]
+full_arr = ints_to_text(o_h_index_arr)
+
 
 def load_data():
 	imgs = load_images()
 	# print(imgs.shape)
 	labels = load_labels()
 	# print(labels.shape)
+
+	# ints_to_text(labels[0])
+	# print(labels.shape)
 	return (imgs,labels)
 
 
-
+# load_data()
 
