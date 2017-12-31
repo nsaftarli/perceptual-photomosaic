@@ -36,20 +36,12 @@ y_train = np.zeros((test_batch_num,text_rows, text_cols, dims), dtype='uint8')
 
 
 def load_images():
-	# tstimg = img_data_dir + image
-	# img = Image.open(tstimg)
-	# print("Image size is: " + str(img.size))
-	# nparray = np.asarray(img,dtype='uint8')
-	# print("Numpy array of image dims are: " + str(nparray.shape))
-
 	for i in range(test_batch_num):
 		imgpath = img_data_dir + 'in_' + str(i) + '.jpg'
 		img = Image.open(imgpath)
 		nparray = np.asarray(img,dtype='uint8')
 		x_train[i] = nparray
 		i += 1
-	# x_train /= 255
-
 	return x_train
 
 
@@ -64,7 +56,6 @@ def load_labels():
 
 def text_to_ints(text):
 	textfile = open(ascii_data_dir + text)
-	# print(textfile)
 	result = np.zeros((text_rows,text_cols), dtype='uint8')
 
 	row_index = 0
