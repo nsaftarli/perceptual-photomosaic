@@ -27,7 +27,7 @@ dims = 16
 # x_train = np.zeros((samples,text_rows,text_cols,3), dtype='uint8')
 # y_train = np.zeros((samples,text_rows*text_cols,dims), dtype='uint8')
 
-test_batch_num = 1000
+test_batch_num = 10000
 
 x_train = np.zeros((test_batch_num,text_rows,text_cols,3), dtype='uint8')
 y_train = np.zeros((test_batch_num,text_rows, text_cols, dims), dtype='uint8')
@@ -48,6 +48,7 @@ def load_images():
 		nparray = np.asarray(img,dtype='uint8')
 		x_train[i] = nparray
 		i += 1
+	# x_train /= 255
 
 	return x_train
 
@@ -91,25 +92,17 @@ def ints_to_text(arr):
 				txtarr += '\n'
 	return txtarr
 
-
+def load_data():
+	imgs = load_images()
+	labels = load_labels()
+	return (imgs,labels)
 
 	
 
-index_arr = text_to_ints('in_0.jpg')
-o_h_index_arr = np.eye(dims)[index_arr]
-full_arr = ints_to_text(o_h_index_arr)
+# index_arr = text_to_ints('in_0.jpg')
+# o_h_index_arr = np.eye(dims)[index_arr]
+# full_arr = ints_to_text(o_h_index_arr)
 
 
-def load_data():
-	imgs = load_images()
-	# print(imgs.shape)
-	labels = load_labels()
-	# print(labels.shape)
 
-	# ints_to_text(labels[0])
-	# print(labels.shape)
-	return (imgs,labels)
-
-
-# load_data()
 
