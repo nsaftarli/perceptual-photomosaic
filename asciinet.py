@@ -1,4 +1,12 @@
 import tensorflow as tf 
+from keras.backend.tensorflow_backend import set_session
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
+config.gpu_options.visible_device_list = "0"
+#session = tf.Session(config=config)
+set_session(tf.Session(config=config))
+
+
 import numpy as np
 import matplotlib.pyplot as plt
 from keras import optimizers
@@ -8,9 +16,12 @@ from keras.models import Sequential, Model
 from keras import Input
 from keras.applications import VGG16
 from keras.preprocessing.image import ImageDataGenerator
+from keras.backend.tensorflow_backend import set_session
 import imgdata
 
-
+# config = tf.ConfigProto()
+# config.gpu_options.allow_growth=True
+# set_session(tf.Session(config=config))
 
 (x_train, y_train) = imgdata.load_data()
 
@@ -85,7 +96,7 @@ x = layers.Conv2D(64,3, activation='relu', padding='same')(x)
 x = layers.BatchNormalization()(x)
 x = layers.Conv2D(64,3, activation='relu', padding='same')(x)
 x = layers.BatchNormalization()(x)
-
+x = layers.Dropout(0.5)(x)
 #Classification layer
 x = layers.Conv2D(16,1, activation='softmax', padding='same')(x)
 
@@ -96,12 +107,30 @@ model.summary()
 
 model.compile(
 	loss='categorical_crossentropy',
-	optimizer=optimizers.SGD(lr=1e-4, momentum=0.9, decay=5e-4),
+	optimizer=optimizers.SGD(lr=1e-4, momentum=0.9),
 	metrics=['accuracy'])
 
 history = model.fit(x_train, y_train, epochs=30, batch_size=64, validation_data=(x_val,y_val))
 
 
 
+model.save('ascii_nn2.h5')
 
+acc = history.history['acc']
+val_acc = history.history['val_acc']
+loss = history.history['loss']
+val_loss = history.history['val_loss']
 
+epochs = range(len(acc))
+
+plt.plot(epochs, acc, 'bo')
+plt.plot(epochs, val_acc, 'b')
+plt.title('Train/Val Accuracy')
+
+plt.figure()
+
+plt.plot(epochs,loss,'bo')
+plt.plot(epochs,val_loss,'b')
+plt.title('Train/Val Loss')
+
+plt.show()

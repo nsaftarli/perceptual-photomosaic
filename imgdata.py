@@ -1,6 +1,8 @@
 import os 
 import numpy as np 
 from PIL import Image
+import matplotlib.mlab as mlab
+import matplotlib.pyplot as plt 
 
 #On Ubuntu
 img_data_dir = '/home/nsaftarli/Documents/ascii-art/ASCIIArtNN/assets/rgb_in/img_celeba/'
@@ -72,6 +74,7 @@ def text_to_ints(text):
 
 def ints_to_text(arr):
 	txtarr = ''
+	print(arr.shape)
 	for row,n in enumerate(arr):
 		for col,m in enumerate(n):
 			x = 0
@@ -89,11 +92,63 @@ def load_data():
 	return (imgs,labels)
 
 	
+def make_histogram():
+	num_bins = 255
+	grouping = 3
+	x = load_images()
+	x = x.flatten()
+
+	# i = 0
+	# j = 0
+	# k = 0
+	# for pixel in x:
+	# 	if pixel == 0:
+	# 		i += 1
+	# 	if pixel == 255:
+	# 		j += 1
+	# 	if pixel == 128:
+	# 		k += 1
+
+	# print("Values: " + str(i) + ", " + str(j) + ", " + str(k))
+	
+	plt.hist(x, bins=256, range=(0,255))
+	plt.yscale('log', nonposy='clip')
+	# plot.show()
+	# plt.show()
+	plt.figure()
+
+	y = load_labels()
+	print(y.shape)
+	y_indices = np.argmax(y, axis=3)
+	y_indices = y_indices.flatten()
+
+
+
+	plt.hist(y_indices, bins=16, range=(0,15))
+	plt.show()
+
+	# plt.hist2d(x,y_indices)
+	# plt.show()
+
+
+	# hist, bins = np.histogram(x, bins=255, range=(0,255))
+	# width = 0.7 * (bins[1]-bins[0])
+	# center = (bins[:-1] + bins[1:]) / 2
+
+	# y = mlab.normpdf(bins)
+	# l = plt.plot(bins, y, 'r--', linewidth=1)
+
+	# plt.bar(center, hist, align='center', width=width)
+	# plt.show()
+
+
+
 
 # index_arr = text_to_ints('in_0.jpg')
 # o_h_index_arr = np.eye(dims)[index_arr]
 # full_arr = ints_to_text(o_h_index_arr)
+# print(full_arr)
+# print(y_train.shape)
 
-
-
+make_histogram()
 
