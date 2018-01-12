@@ -14,6 +14,7 @@ from keras.applications import VGG16
 from keras import models
 from keras.preprocessing.image import ImageDataGenerator
 import imgdata
+from sklearn.utils import class_weight 
 
 model = models.load_model('ascii_nn4.h5')
 model.summary()
@@ -22,9 +23,6 @@ model.summary()
 (x_train, y_train) = imgdata.load_data(batch_size=10000)
 
 x_train = x_train.astype('float32')
-x_train /= 255
-# x_train -= np.mean(x_train,axis=3, keepdims=True)
-
 
 
 
@@ -42,34 +40,16 @@ y_test = y_train[:split]
 y_val = y_train[split:(2 * split)]
 y_train = y_train[(2 * split):]
 
-#Median Frequency Balancing:
-class_freq = imgdata.get_class_weights(size=8000, targets=y_train)
-class_freq = np.sort(class_freq)
-median_freq = np.median(class_freq)
-balanced_freq = median_freq/class_freq
 
-
-
-# input_tensor = Input(shape=(224,224,3))
 
 model.compile(
 	loss='categorical_crossentropy',
-	optimizer=optimizers.SGD(lr=1e-3, momentum=0.9, decay=5e-4),
+	optimizer=optimizers.SGD(lr=1e-2, momentum=0.9, decay=5e-3),
 	metrics=['accuracy']
 	
 )
 
-history = model.fit(x_train, y_train, epochs=10, batch_size=32, validation_data=(x_val,y_val), class_weight=balanced_freq)
-
-
-# history = model.fit(x_train, y_train, epochs=20, batch_size=64, validation_data=(x_val,y_val), class_weight=balanced_freq)
-
-	# class_weight=[ 
-	# 0.0931816,   0.07889178,  0.0683163,  0.0599477,  0.0576133,  
-	# 0.0596811, 0.0649174,  0.0713340,  0.0777491,  0.0805642,  
-	# 0.0774501,  0.0663205, 0.0514884,  0.0368726,  0.0278029,  
-	# 0.0278682
-	# ]
+history = model.fit(x_train, y_train, epochs=10, batch_size=32, validation_data=(x_val,y_val))
 
 model.save('ascii_nn5.h5')
 
