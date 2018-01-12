@@ -12,18 +12,17 @@ import numpy as np
 
 from PIL import Image
 
-img_data_dir = '/home/nsaftarli/Documents/ascii-art/ASCIIArtNN/assets/rgb_in/img_celeba/'
-ascii_data_dir = '/home/nsaftarli/Documents/ascii-art/ASCIIArtNN/assets/ascii_out/'
+img_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/rgb_in/img_celeba/'
+ascii_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/ascii_out/'
 
 char_array = np.asarray(['M','N','H','Q', '$', 'O','C', '?','7','>','!',':','-',';','.',' '])
-# char_array = np.asarray(['#', ' '])
 char_dict = {'M':0,'N':1,'H':2,'Q':3,'$':4,'O':5,'C':6,'?':7,'7':8,'>':9,'!':10,':':11,'-':12,';':13,'.':14,' ':15}
 
 
-base_model = models.load_model('ascii_nn4.h5')
+base_model = models.load_model('ascii_nn5.h5')
 
-#Predicts ascii output of a single image
-def main(model='ascii_nn4.h5', img_name='in_0.jpg'):
+#Predicts ascii output of a given image
+def main(img_name='in_0.jpg'):
 	
 	img_path = img_data_dir + img_name
 	img = image.load_img(img_path, target_size=(224,224))
@@ -79,8 +78,6 @@ def per_char_acc(size=10000, textrows=224, textcols=224, dims=16):
 		
 	y_pred = base_model.predict(x_eval)
 	y_pred = np.argmax(y_pred,axis=3)
-
-	# to_text(y_pred[0])
 	
 
 	flattened_labels = np.asarray(y_eval.flatten(), dtype='uint8')
@@ -98,46 +95,49 @@ def per_char_acc(size=10000, textrows=224, textcols=224, dims=16):
 		a = np.sum(z == True)
 		print((a / total_characters[m]) * 100)
 
-# def char_counts(size=10000, textrows=224, textcols=224, dims=16):
-# 	import imgdata as im 
+def char_counts(size=8000, textrows=224, textcols=224, dims=16):
+	import imgdata as im 
 
-# 	y_labels = im.load_labels(size,textrows,textcols)
+	y_labels = im.load_labels(size,textrows,textcols)
+	print(y_labels.shape)
+	print(np.argmax(y_labels, axis=3))
+	y_labels = np.argmax(y_labels,axis=3)
 
-# 	total_characters = np.zeros((dims,))
+	total_characters = np.zeros((dims,))
 
-# 	for n, el in enumerate(y_labels):
-# 		label_name = 'in_' + str(2000 + n) + '.jpg'
-# 		label_path = ascii_data_dir + img_name
+	for n, el in enumerate(y_labels):
+		label_name = 'in_' + str(2000 + n) + '.jpg'
+		label_path = ascii_data_dir + label_name
 
-# 		y_labels[n] = get_label(label_path, textrows, textcols, dims)
+		y_labels[n] = get_label(label_path, textrows, textcols, dims)
 
-# 	flattened_labels = np.asarray(y_labels.flatten(), dtype='uint8')
+	flattened_labels = np.asarray(y_labels.flatten(), dtype='uint8')
 
-# 	for n, el in enumerate(flattened_labels):
-# 		total_characters[el] += 1
+	for n, el in enumerate(flattened_labels):
+		total_characters[el] += 1
 
-# 	print("#######################################################################")
-# 	print("TOTAL NUMBER OF CHARACTERS: " + np.sum(total_characters))
-# 	print("#######################################################################")
-# 	print("NUMBER OF TIMES EACH CHARACTER HAS APPEARED")
-# 	print("M: " + str(total_characters[0]))
-# 	print("N: " + str(total_characters[1]))
-# 	print("H: " + str(total_characters[2]))
-# 	print("Q: " + str(total_characters[3]))
-# 	print("$: " + str(total_characters[4]))
-# 	print("O: " + str(total_characters[5]))
-# 	print("C: " + str(total_characters[6]))
-# 	print("?: " + str(total_characters[7]))
-# 	print("7: " + str(total_characters[8]))
-# 	print(">: " + str(total_characters[9]))
-# 	print("!: " + str(total_characters[10]))
-# 	print(":: " + str(total_characters[11]))
-# 	print("-: " + str(total_characters[12]))
-# 	print(";: " + str(total_characters[13]))
-# 	print(".: " + str(total_characters[14]))
-# 	print("SPACE: " + str(total_characters[15]))	
+	print("#######################################################################")
+	print("TOTAL NUMBER OF CHARACTERS: " + str(np.sum(total_characters)))
+	print("#######################################################################")
+	print("NUMBER OF TIMES EACH CHARACTER HAS APPEARED")
+	print("M: " + str(total_characters[0]))
+	print("N: " + str(total_characters[1]))
+	print("H: " + str(total_characters[2]))
+	print("Q: " + str(total_characters[3]))
+	print("$: " + str(total_characters[4]))
+	print("O: " + str(total_characters[5]))
+	print("C: " + str(total_characters[6]))
+	print("?: " + str(total_characters[7]))
+	print("7: " + str(total_characters[8]))
+	print(">: " + str(total_characters[9]))
+	print("!: " + str(total_characters[10]))
+	print(":: " + str(total_characters[11]))
+	print("-: " + str(total_characters[12]))
+	print(";: " + str(total_characters[13]))
+	print(".: " + str(total_characters[14]))
+	print("SPACE: " + str(total_characters[15]))	
 
-# 	return total_characters
+	return total_characters
 
 
 
@@ -155,6 +155,7 @@ def get_label(label_path,textrows,textcols,dims):
 	Output: 2D array of indices, where each index is a number that represents a character specified by char_dict 
 
 	'''
+	print(label_path)
 	f = open(label_path,'r')
 	buff = ''
 	arr = np.zeros((textrows,textcols), dtype='uint8')
@@ -180,6 +181,4 @@ def to_text(arr):
 				buff += '\n'
 			buff += col
 	print(buff)
-
-# per_char_acc(2,3)
 
