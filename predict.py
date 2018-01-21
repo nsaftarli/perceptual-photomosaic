@@ -8,18 +8,32 @@ set_session(tf.Session(config=config))
 from keras import models
 from keras.preprocessing import image 
 from keras.models import Model 
+import keras.backend as K 
 import numpy as np 
-
+import matplotlib.mlab as mlab
+import matplotlib.pyplot as plt 
+import imgdata as im 
 from PIL import Image
 
 img_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/rgb_in/img_celeba/'
-ascii_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/ascii_out/'
+# ascii_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/ascii_out/'
+ascii_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/ssim_imgs/'
+
+
+# def weighted_categorical_crossentropy(w):
+def loss(y_true, y_pred):
+    y_pred /= K.sum(y_pred, axis=-1, keepdims=True)
+    y_pred = K.clip(y_pred, K.epsilon(), 1 - K.epsilon())
+    loss = y_true * K.log(y_pred) 
+    loss = -K.sum(loss, -1)
+    return loss
+    # return loss 
 
 char_array = np.asarray(['M','N','H','Q', '$', 'O','C', '?','7','>','!',':','-',';','.',' '])
 char_dict = {'M':0,'N':1,'H':2,'Q':3,'$':4,'O':5,'C':6,'?':7,'7':8,'>':9,'!':10,':':11,'-':12,';':13,'.':14,' ':15}
 
 
-base_model = models.load_model('ascii_nn5.h5')
+base_model = models.load_model('ascii_nn8.h5', custom_objects={'loss':loss})
 
 #Predicts ascii output of a given image
 def main(img_name='in_0.jpg'):
@@ -30,8 +44,8 @@ def main(img_name='in_0.jpg'):
 	x = np.expand_dims(x, axis=0)
 	n = base_model.predict(x)
 	maxes = np.argmax(n,axis=3)
-	print(maxes)
-	print(maxes.shape)
+	# print(maxes)
+	# print(maxes.shape)
 
 	buff = ''
 
@@ -42,8 +56,32 @@ def main(img_name='in_0.jpg'):
 			buff += '\n'
 	print(buff)
 
+def get_patches(imgarray):
+	num_of_patches = 35
+
+	patch_size = 28
+
+
+	result = []
+	result = np.zeros((num_of_patches * num_of_patches,patch_size,patch_size))
+	x = 0
+	y = 0
+	# a = [[1,2,3],[4,5,6],[7,8,9]]
+	# a = np.asarray(a, dtype='uint8')
+	# print(a[0])
+	# print(imgarray.shape)
+	imgarray = np.asarray(imgarray, dtype='uint8')
+	for i in range(num_of_patches):
+		for j in range(num_of_patches):
+			patch = imgarray[patch_size * i : patch_size * (i+1), patch_size * j : patch_size * (j+1)]
+			result[x,:,:] = patch
+			x += 1
+	result = np.asarray(result,dtype='uint8')
+	return result
+
+
 #Gets per character accuracy of predicted output
-def per_char_acc(size=10000, textrows=224, textcols=224, dims=16):
+def per_char_acc(size=10000, imgrows=224, imgcols=224, textrows=224, textcols=224, dims=16):
 	'''
 	Inputs:
 		size: number of examples to use
@@ -55,9 +93,9 @@ def per_char_acc(size=10000, textrows=224, textcols=224, dims=16):
 
 	'''
 
-	x_eval = np.zeros((size,textrows,textcols,3))
+	x_eval = np.zeros((size,imgrows,imgcols,3))
 
-	y_pred = np.zeros((size,textrows,textcols,3))
+	y_pred = np.zeros((size,textrows,textcols))
 	y_eval = np.zeros((size,textrows,textcols))
 
 	total_characters = np.zeros((dims,))
@@ -67,7 +105,7 @@ def per_char_acc(size=10000, textrows=224, textcols=224, dims=16):
 	for n, el in enumerate(y_eval):
 		img_name = 'in_' + str(2000 + n) + '.jpg'
 		img_path = img_data_dir + img_name
-		label_path = ascii_data_dir + img_name
+		label_path = ascii_data_dir + img_name + '.txt'
 
 		img = np.asarray(Image.open(img_path), dtype='uint8')
 		x_eval[n] = img 
@@ -96,17 +134,15 @@ def per_char_acc(size=10000, textrows=224, textcols=224, dims=16):
 		print((a / total_characters[m]) * 100)
 
 def char_counts(size=8000, textrows=224, textcols=224, dims=16):
-	import imgdata as im 
-
 	y_labels = im.load_labels(size,textrows,textcols)
 	print(y_labels.shape)
 	print(np.argmax(y_labels, axis=3))
 	y_labels = np.argmax(y_labels,axis=3)
 
-	total_characters = np.zeros((dims,))
+	totals = [0] * dims
 
 	for n, el in enumerate(y_labels):
-		label_name = 'in_' + str(2000 + n) + '.jpg'
+		label_name = 'in_' + str(2000 + n) + '.jpg.txt'
 		label_path = ascii_data_dir + label_name
 
 		y_labels[n] = get_label(label_path, textrows, textcols, dims)
@@ -114,31 +150,31 @@ def char_counts(size=8000, textrows=224, textcols=224, dims=16):
 	flattened_labels = np.asarray(y_labels.flatten(), dtype='uint8')
 
 	for n, el in enumerate(flattened_labels):
-		total_characters[el] += 1
+		totals[el] += 1
 
 	print("#######################################################################")
-	print("TOTAL NUMBER OF CHARACTERS: " + str(np.sum(total_characters)))
+	print("TOTAL NUMBER OF CHARACTERS: " + str(np.sum(totals)))
 	print("#######################################################################")
 	print("NUMBER OF TIMES EACH CHARACTER HAS APPEARED")
-	print("M: " + str(total_characters[0]))
-	print("N: " + str(total_characters[1]))
-	print("H: " + str(total_characters[2]))
-	print("Q: " + str(total_characters[3]))
-	print("$: " + str(total_characters[4]))
-	print("O: " + str(total_characters[5]))
-	print("C: " + str(total_characters[6]))
-	print("?: " + str(total_characters[7]))
-	print("7: " + str(total_characters[8]))
-	print(">: " + str(total_characters[9]))
-	print("!: " + str(total_characters[10]))
-	print(":: " + str(total_characters[11]))
-	print("-: " + str(total_characters[12]))
-	print(";: " + str(total_characters[13]))
-	print(".: " + str(total_characters[14]))
-	print("SPACE: " + str(total_characters[15]))	
+	print("M: " + str(totals[0]))
+	print("N: " + str(totals[1]))
+	print("H: " + str(totals[2]))
+	print("Q: " + str(totals[3]))
+	print("$: " + str(totals[4]))
+	print("O: " + str(totals[5]))
+	print("C: " + str(totals[6]))
+	print("?: " + str(totals[7]))
+	print("7: " + str(totals[8]))
+	print(">: " + str(totals[9]))
+	print("!: " + str(totals[10]))
+	print(":: " + str(totals[11]))
+	print("-: " + str(totals[12]))
+	print(";: " + str(totals[13]))
+	print(".: " + str(totals[14]))
+	print("SPACE: " + str(totals[15]))
+	return(totals)
 
-	return total_characters
-
+	
 
 
 def get_label(label_path,textrows,textcols,dims):
@@ -155,21 +191,31 @@ def get_label(label_path,textrows,textcols,dims):
 	Output: 2D array of indices, where each index is a number that represents a character specified by char_dict 
 
 	'''
-	print(label_path)
+	# print(label_path)
 	f = open(label_path,'r')
-	buff = ''
 	arr = np.zeros((textrows,textcols), dtype='uint8')
 	n = 0
-	m = 0
+	m = 0 
+	acc = 0
 	for y,row in enumerate(f):
 		for x,col in enumerate(row):
-			if x % 224 == 0 and x is not 0:
+			acc+=1
+			if x % 28 == 0 and x is not 0:
 				n += 1
 				m = 0
+			if x == 64:
+				break
 			arr[n][m] = char_dict[col]
 			m += 1
 	return arr
+def in_newline(string):
+	buff = ''
 
+	for i,row in enumerate(string):
+		if i % 28 ==0:
+			buff += '\n'
+		buff += row
+	print(buff)
 def to_text(arr):
 	'''
 	Given a numpy array of numbers, turns array into ASCII image
@@ -182,3 +228,4 @@ def to_text(arr):
 			buff += col
 	print(buff)
 
+# per_char_acc(size=8000, imgrows=224, imgcols=224, textrows=28, textcols=28)

@@ -5,23 +5,22 @@ import matplotlib.mlab as mlab
 import matplotlib.pyplot as plt 
 
 img_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/rgb_in/img_celeba/'
-ascii_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/ascii_out/'
+# ascii_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/ascii_out/'
+ascii_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/ssim_imgs/'
 
 char_array = np.asarray(['M','N','H','Q', '$', 'O','C', '?','7','>','!',':','-',';','.',' '])
 char_dict = {'M':0,'N':1,'H':2,'Q':3,'$':4,'O':5,'C':6,'?':7,'7':8,'>':9,'!':10,':':11,'-':12,';':13,'.':14,' ':15}
-# char_array = np.asarray(['#', ' '])
-# char_dict = {'#':0, ' ':1}
 
 
 samples = 202533
-text_rows = 224
-text_cols = 224
+text_rows = 28
+text_cols = 28
 
 
 
-def load_data(batch_size=10000, rows=224, cols=224):
-	imgs = load_images(batch_size, rows, cols)
-	labels = load_labels(batch_size, rows, cols)
+def load_data(batch_size=10000, img_rows=224, img_cols=224, txt_rows=28, txt_cols=28):
+	imgs = load_images(batch_size, img_rows, img_cols)
+	labels = load_labels(batch_size, txt_rows, txt_cols)
 	return (imgs,labels)
 
 
@@ -39,7 +38,7 @@ def load_images(size, rows, cols):
 def load_labels(size, rows, cols):
 	y = np.zeros((size, rows, cols, len(char_array)), dtype='uint8')
 	for i in range(size):
-		labelpath = 'in_' + str(i) + '.jpg'
+		labelpath = 'in_' + str(i) + '.jpg.txt'
 		indices = text_to_ints(labelpath, rows, cols)
 		y[i] = np.eye(len(char_array))[indices]
 	return y
@@ -218,3 +217,16 @@ def get_label(label_path,textrows,textcols,dims):
 			arr[n][m] = char_dict[col]
 			m += 1
 	return arr
+
+def load_chars(path='./assets/char_set/',img_size=28):
+	length = len(os.listdir(path))
+	char_imgs = np.zeros((length,img_size,img_size,3))
+	char_labels = []
+	for i,filename in enumerate(os.listdir(path)):
+		# print(filename)
+		img = Image.open(path + filename)
+		char_imgs[i] = np.asarray(img,dtype='uint8')
+		char_labels.append(filename[:-4])
+	return char_imgs, char_labels
+
+load_data()
