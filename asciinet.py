@@ -49,7 +49,7 @@ def main(size=22000, split=1000, train_type='m'):
 	#Compile the model with our loss function
 	model.compile(
 	loss=wcc,
-	optimizer=optimizers.SGD(lr=0.1, momentum=0.9),
+	optimizer=optimizers.SGD(lr=1e-3, momentum=0.9),
 	metrics=['accuracy']
 	)
 
@@ -243,16 +243,22 @@ def use_generator():
 
 
 def mfb():
-	c = predict.char_counts(textrows=28,textcols=28)
-	c = np.asarray(c,dtype='float32')
-	print(c)
-	print(np.sum(c))
-	c_sum = np.sum(c)
+	total_counts, appearances = predict.char_counts(textrows=28,textcols=28)
+	total_counts = np.asarray(total_counts,dtype='float32')
+	appearances = np.asarray(appearances,dtype='float32')
+	print(total_counts.shape)
+	print(appearances.shape)
 
-	char_freqs = np.divide(c, c_sum)
-	print('MEDIAN: ')
-	median_freqs = np.median(char_freqs) / char_freqs
-	print(median_freqs)
+
+	freq_counts = total_counts / appearances
+	print("FREQUENCY COUNTS: ")
+	print(freq_counts)
+
+
+
+	median_freqs = np.median(total_counts) / freq_counts
+
+	
 	return median_freqs
 
 
@@ -261,7 +267,7 @@ def weighted_categorical_crossentropy(w):
     def loss(y_true, y_pred):
     	y_pred /= K.sum(y_pred, axis=-1, keepdims=True)
     	y_pred = K.clip(y_pred, K.epsilon(), 1 - K.epsilon())
-    	loss = y_true * K.log(y_pred) #* w
+    	loss = y_true * K.log(y_pred) * w
     	loss = -K.sum(loss, -1)
     	return loss
     return loss 

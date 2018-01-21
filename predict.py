@@ -135,17 +135,29 @@ def per_char_acc(size=10000, imgrows=224, imgcols=224, textrows=224, textcols=22
 
 def char_counts(size=8000, textrows=224, textcols=224, dims=16):
 	y_labels = im.load_labels(size,textrows,textcols)
+
 	print(y_labels.shape)
 	print(np.argmax(y_labels, axis=3))
 	y_labels = np.argmax(y_labels,axis=3)
 
 	totals = [0] * dims
+	docs = [0] * dims
 
 	for n, el in enumerate(y_labels):
 		label_name = 'in_' + str(2000 + n) + '.jpg.txt'
 		label_path = ascii_data_dir + label_name
 
 		y_labels[n] = get_label(label_path, textrows, textcols, dims)
+
+	for i in range(16):
+		for label in y_labels:
+			if i in label:
+				docs[i] += label.shape[0] * label.shape[1]
+
+	print(docs)
+
+
+
 
 	flattened_labels = np.asarray(y_labels.flatten(), dtype='uint8')
 
@@ -172,7 +184,7 @@ def char_counts(size=8000, textrows=224, textcols=224, dims=16):
 	print(";: " + str(totals[13]))
 	print(".: " + str(totals[14]))
 	print("SPACE: " + str(totals[15]))
-	return(totals)
+	return (totals,docs)
 
 	
 
