@@ -12,9 +12,14 @@ from keras.models import Sequential, Model
 from keras import Input
 from keras.applications import VGG16
 from keras.preprocessing.image import ImageDataGenerator
+from keras.callbacks import ReduceLROnPlateau
+import keras.backend as K
 import imgdata
-from sklearn.utils import class_weight
-import loss
+# from sklearn.utils import class_weight
+# import loss
+import predict
+from itertools import product
+import something
 
 '''
 Dataset settings
@@ -24,24 +29,37 @@ text_cols = 224
 dims = 16
 
 img_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/rgb_in/img_celeba/'
-ascii_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/ascii_out/'
+# ascii_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/ascii_out/'
+ascii_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/ssim_imgs/'
 
 char_array = np.asarray(['M','N','H','Q', '$', 'O','C', '?','7','>','!',':','-',';','.',' '])
 char_dict = {'M':0,'N':1,'H':2,'Q':3,'$':4,'O':5,'C':6,'?':7,'7':8,'>':9,'!':10,':':11,'-':12,';':13,'.':14,' ':15}
 
-def main(size=10000, split=1000, train_type='fit'):
+
+def main(size=22000, split=1000, train_type='m'):
+
+	#Get per character weights, use them for loss
+	weights = mfb()
+	wcc = weighted_categorical_crossentropy(weights)
+	print('WEIGHTS: ' + str(weights))
+
+	#Create the model
 	model = build_model()
 
+	#Compile the model with our loss function
 	model.compile(
-	loss='categorical_crossentropy',
-	optimizer=optimizers.SGD(lr=1e-2, momentum=0.9),
+	loss=wcc,
+	optimizer=optimizers.SGD(lr=1e-3, momentum=0.9),
 	metrics=['accuracy']
 	)
 
-	if train_type is 'fit':
+
+	if train_type is 'm':
 
 		(x_train, y_train) = imgdata.load_data(batch_size=size)
 		x_train = x_train.astype('float32')
+
+		
 
 		#Shuffle arrays.
 		rng_state = np.random.get_state()
@@ -58,26 +76,31 @@ def main(size=10000, split=1000, train_type='fit'):
 		y_val = y_train[split:(2 * split)]
 		y_train = y_train[(2 * split):]
 
+		reduce_lr = ReduceLROnPlateau(monitor='val_loss', patience=3, min_lr=1e-5)
 
 		history = model.fit(
 			x_train, 
 			y_train, 
-			epochs=40, 
+			epochs=60, 
 			batch_size=32, 
-			validation_data=(x_val,y_val)
+			validation_data=(x_val,y_val),
+			callbacks=[reduce_lr]
 			)
-		model.save('ascii_nn5.h5')
+		model.save('ascii_nn8.h5')
 		get_results(history)
 		
-	else:
-		use_generator()
+	elif train_type is 'g':
+		reduce_lr = ReduceLROnPlateau(monitor='loss', patience=5, min_lr=1e-4)
+		history = model.fit_generator(use_generator(), steps_per_epoch=250, epochs=10)
+		model.save('ascii_nn7.h5')
+		
 
 
 def build_model(vgg_train=False):
 	input_tensor = Input(shape=(224,224,3))
 
 	vgg = VGG16(weights='imagenet', include_top=False, input_shape=(text_rows,text_cols,3))
-	vgg.summary()
+	# vgg.summary()
 
 	if vgg_train is False:
 		# Freeze VGG layers
@@ -172,7 +195,7 @@ def build_model(vgg_train=False):
 	batch5 = BatchNormalization()(conv5)
 
 	#Final prediction layer
-	soft5 = Conv2D(dims, 1, activation='softmax', padding='same')(batch5)
+	soft5 = Conv2D(dims, 1, strides=8, activation='softmax', padding='same')(batch5)
 
 
 	model = Model(input_tensor,soft5)
@@ -187,26 +210,66 @@ def get_results(history):
 	loss = history.history['loss']
 	val_loss = history.history['val_loss']
 
+
+
 	epochs = range(len(acc))
 
-	plt.plot(epochs, acc, 'bo')
-	plt.plot(epochs, val_acc, 'b')
+	plt.figure(figsize=(10,10))
+
+	plt.subplot(211)
+	plt.plot(epochs, acc, 'bo', label='Training Accuracy')
+	plt.plot(epochs, val_acc, 'b', label='Validation Accuracy')
 	plt.title('Train/Val Accuracy')
+	plt.legend()
 
-	plt.figure()
+	plt.subplot(212)
+	# plt.subplots_adjust(top=2)
 
-	plt.plot(epochs,loss,'bo')
-	plt.plot(epochs,val_loss,'b')
+	plt.plot(epochs,loss,'bo', label='Training Loss')
+	plt.plot(epochs,val_loss,'b', label='Validation Loss')
 	plt.title('Train/Val Loss')
+	plt.legend()
+
+	plt.savefig('latest_fig.jpg')
 
 	plt.show()
 
 def use_generator():
-	train_datagen = ImageDataGenerator()
-	val_datagen = ImageDataGenerator()
+	while True:
+		(x_train, y_train) = imgdata.load_data(batch_size=32)
+		yield (x_train, y_train)
 
 
 
 
+def mfb():
+	total_counts, appearances = predict.char_counts(textrows=28,textcols=28)
+	total_counts = np.asarray(total_counts,dtype='float32')
+	appearances = np.asarray(appearances,dtype='float32')
+	print(total_counts.shape)
+	print(appearances.shape)
 
 
+	freq_counts = total_counts / appearances
+	print("FREQUENCY COUNTS: ")
+	print(freq_counts)
+
+
+
+	median_freqs = np.median(total_counts) / freq_counts
+
+	
+	return median_freqs
+
+
+
+def weighted_categorical_crossentropy(w):
+    def loss(y_true, y_pred):
+    	y_pred /= K.sum(y_pred, axis=-1, keepdims=True)
+    	y_pred = K.clip(y_pred, K.epsilon(), 1 - K.epsilon())
+    	loss = y_true * K.log(y_pred) * w
+    	loss = -K.sum(loss, -1)
+    	return loss
+    return loss 
+
+main(train_type='m')
