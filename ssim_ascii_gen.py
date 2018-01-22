@@ -12,7 +12,7 @@ import math
 char_set = ['M','N','H','Q', '$', 'O','C', '?','7','>','!',':','-',';','.',' ']
 # char_set = ['#','#','#','#','#','#','#','#',' ',' ',' ',' ',' ',' ',' ',' ']
 char_set_dir = './assets/char_set/'
-out_dir = './assets/ssim_imgs/'
+out_dir = './assets/ssim_imgs_val/'
 img_dir = './assets/rgb_in/img_celeba/'
 c1 = 0.01 ** 2
 c2 = 0.03 ** 2
@@ -194,7 +194,7 @@ def get_structure(patch,char):
 	# for char in char_mus:
 	# 	lum = 2 * 
 
-for i in range(30000):
+for i in range(30000,40000):
 	print(str(i))
 	x = 'in_' + str(i) + '.jpg'
 	main(img_name=x)

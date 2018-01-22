@@ -49,7 +49,7 @@ def main(size=22000, split=1000, train_type='m'):
 	#Compile the model with our loss function
 	model.compile(
 	loss=wcc,
-	optimizer=optimizers.SGD(lr=1e-3, momentum=0.9),
+	optimizer=optimizers.SGD(lr=0.1, momentum=0.9),
 	metrics=['accuracy']
 	)
 
@@ -62,10 +62,10 @@ def main(size=22000, split=1000, train_type='m'):
 		
 
 		#Shuffle arrays.
-		rng_state = np.random.get_state()
-		np.random.shuffle(x_train)
-		np.random.set_state(rng_state)
-		np.random.shuffle(y_train)
+		# rng_state = np.random.get_state()
+		# np.random.shuffle(x_train)
+		# np.random.set_state(rng_state)
+		# np.random.shuffle(y_train)
 
 		#Split both into train/val/test sets
 		x_test = x_train[:split]
@@ -76,12 +76,12 @@ def main(size=22000, split=1000, train_type='m'):
 		y_val = y_train[split:(2 * split)]
 		y_train = y_train[(2 * split):]
 
-		reduce_lr = ReduceLROnPlateau(monitor='val_loss', patience=3, min_lr=1e-5)
+		reduce_lr = ReduceLROnPlateau(monitor='val_loss', patience=3, min_lr=1e-3)
 
 		history = model.fit(
 			x_train, 
 			y_train, 
-			epochs=60, 
+			epochs=20, 
 			batch_size=32, 
 			validation_data=(x_val,y_val),
 			callbacks=[reduce_lr]
@@ -90,9 +90,17 @@ def main(size=22000, split=1000, train_type='m'):
 		get_results(history)
 		
 	elif train_type is 'g':
-		reduce_lr = ReduceLROnPlateau(monitor='loss', patience=5, min_lr=1e-4)
-		history = model.fit_generator(use_generator(), steps_per_epoch=250, epochs=10)
-		model.save('ascii_nn7.h5')
+		reduce_lr = ReduceLROnPlateau(monitor='loss', patience=3, min_lr=1e-4)
+		history = model.fit_generator(
+			use_generator(), 
+			steps_per_epoch=625, 
+			epochs=10, 
+			callbacks=[reduce_lr],
+			validation_data=val_generator(),
+			validation_steps=62
+			)
+		model.save('ascii_nn_gen.h5')
+		get_results(history)
 		
 
 
@@ -195,7 +203,7 @@ def build_model(vgg_train=False):
 	batch5 = BatchNormalization()(conv5)
 
 	#Final prediction layer
-	soft5 = Conv2D(dims, 1, strides=8, activation='softmax', padding='same')(batch5)
+	soft5 = Conv2D(dims, kernel_size=8, strides=8, activation='softmax', padding='same')(batch5)
 
 
 	model = Model(input_tensor,soft5)
@@ -230,7 +238,7 @@ def get_results(history):
 	plt.title('Train/Val Loss')
 	plt.legend()
 
-	plt.savefig('latest_fig.jpg')
+	plt.savefig('latest_fig_gen.jpg')
 
 	plt.show()
 
@@ -239,15 +247,39 @@ def use_generator():
 		(x_train, y_train) = imgdata.load_data(batch_size=32)
 		yield (x_train, y_train)
 
+def val_generator():
+	while True:
+		(x_val, y_val) = imgdata.load_val_data()
+		yield (x_val, y_val)
+
 
 
 
 def mfb():
-	total_counts, appearances = predict.char_counts(textrows=28,textcols=28)
+	total_counts, appearances = predict.char_counts(size=20000,textrows=28,textcols=28)
 	total_counts = np.asarray(total_counts,dtype='float32')
 	appearances = np.asarray(appearances,dtype='float32')
 	print(total_counts.shape)
 	print(appearances.shape)
+	print("TOTAL COUNTS: ")
+	print(total_counts)
+
+
+	sum_total = np.sum(total_counts)
+	print("SUM OF CHARACTERS: ")
+	print(sum_total)
+
+	# print("NORMALIZED: ")
+	# total_counts /= sum_total
+	# print(total_counts)
+
+
+	# print("WEIGHTED: ")
+	# total_counts = 1. - total_counts
+
+	# print(total_counts)
+
+
 
 
 	freq_counts = total_counts / appearances
@@ -257,6 +289,8 @@ def mfb():
 
 
 	median_freqs = np.median(total_counts) / freq_counts
+
+	median_freqs /= np.sum(median_freqs)
 
 	
 	return median_freqs
@@ -272,4 +306,4 @@ def weighted_categorical_crossentropy(w):
     	return loss
     return loss 
 
-main(train_type='m')
+main(train_type='g')

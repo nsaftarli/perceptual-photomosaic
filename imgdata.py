@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 img_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/rgb_in/img_celeba/'
 # ascii_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/ascii_out/'
 ascii_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/ssim_imgs/'
+val_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/ssim_imgs_val/'
 
 char_array = np.asarray(['M','N','H','Q', '$', 'O','C', '?','7','>','!',':','-',';','.',' '])
 char_dict = {'M':0,'N':1,'H':2,'Q':3,'$':4,'O':5,'C':6,'?':7,'7':8,'>':9,'!':10,':':11,'-':12,';':13,'.':14,' ':15}
@@ -23,29 +24,43 @@ def load_data(batch_size=10000, img_rows=224, img_cols=224, txt_rows=28, txt_col
 	labels = load_labels(batch_size, txt_rows, txt_cols)
 	return (imgs,labels)
 
+def load_val_data(batch_size=32, img_rows=224, img_cols= 224, txt_rows=28, txt_cols=28):
+	imgs = load_images(batch_size, img_rows, img_cols, val=True)
+	labels = load_labels(batch_size, txt_rows, txt_cols, val=True)
+	return (imgs,labels)
 
 
-def load_images(size, rows, cols):
+
+def load_images(size, rows, cols, val=False):
 	x = np.zeros((size,rows,cols,3), dtype='uint8')
 	for i in range(size):
-		imgpath = img_data_dir + 'in_' + str(i) + '.jpg'
+		if val:
+			imgpath = img_data_dir + 'in_' + str(i+30000) + '.jpg.txt'
+		else:
+			imgpath = img_data_dir + 'in_' + str(i) + '.jpg'
 		img = Image.open(imgpath)
 		x[i] = np.asarray(img,dtype='uint8')
 		i += 1
 	return x
 
 
-def load_labels(size, rows, cols):
+def load_labels(size, rows, cols, val=False):
 	y = np.zeros((size, rows, cols, len(char_array)), dtype='uint8')
 	for i in range(size):
-		labelpath = 'in_' + str(i) + '.jpg.txt'
-		indices = text_to_ints(labelpath, rows, cols)
+		if val:
+			labelpath = 'in_' + str(i+30000) + '.jpg.txt'
+		else:
+			labelpath = 'in_' + str(i) + '.jpg.txt'
+		indices = text_to_ints(labelpath, rows, cols, val)
 		y[i] = np.eye(len(char_array))[indices]
 	return y
 
 
-def text_to_ints(text, rows, cols):
-	textfile = open(ascii_data_dir + text)
+def text_to_ints(text, rows, cols, val):
+	if val:
+		textfile = open(val_data_dir + text)
+	else:
+		textfile = open(ascii_data_dir + text)
 	result = np.zeros((text_rows,text_cols), dtype='uint8')
 
 	row_index = 0
