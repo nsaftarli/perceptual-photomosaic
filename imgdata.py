@@ -3,14 +3,17 @@ import numpy as np
 from PIL import Image
 import matplotlib.mlab as mlab
 import matplotlib.pyplot as plt 
+from constants import Constants
 
-img_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/rgb_in/img_celeba/'
+const = Constants()
+
+img_data_dir = const.img_data_dir
 # ascii_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/ascii_out/'
-ascii_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/ssim_imgs/'
-val_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/ssim_imgs_val/'
+ascii_data_dir = const.ascii_data_dir
+val_data_dir = const.val_data_dir
 
-char_array = np.asarray(['M','N','H','Q', '$', 'O','C', '?','7','>','!',':','-',';','.',' '])
-char_dict = {'M':0,'N':1,'H':2,'Q':3,'$':4,'O':5,'C':6,'?':7,'7':8,'>':9,'!':10,':':11,'-':12,';':13,'.':14,' ':15}
+char_array = const.char_array
+char_dict = const.char_dict
 
 
 samples = 202533
@@ -19,38 +22,58 @@ text_cols = 28
 
 
 
-def load_data(batch_size=10000, img_rows=224, img_cols=224, txt_rows=28, txt_cols=28):
-	imgs = load_images(batch_size, img_rows, img_cols)
-	labels = load_labels(batch_size, txt_rows, txt_cols)
-	return (imgs,labels)
+def load_data(num_batches, batch_size=32, img_rows=224, img_cols=224, txt_rows=28, txt_cols=28):
+	ind = 0
+	while True:
+		imgs = load_images(batch_size, img_rows, img_cols, start_index=ind)
+		labels = load_labels(batch_size, txt_rows, txt_cols, start_index=ind)
+		ind += 1
+		yield (imgs,labels)
+		if ind == num_batches:
+			ind = 0
 
-def load_val_data(batch_size=32, img_rows=224, img_cols= 224, txt_rows=28, txt_cols=28):
-	imgs = load_images(batch_size, img_rows, img_cols, val=True)
-	labels = load_labels(batch_size, txt_rows, txt_cols, val=True)
-	return (imgs,labels)
+
+def load_val_data(num_batches, batch_size=32, img_rows=224, img_cols= 224, txt_rows=28, txt_cols=28):
+	ind = 0
+	while True:
+		imgs = load_images(batch_size, img_rows, img_cols, start_index=ind, val=True)
+		labels = load_labels(batch_size, txt_rows, txt_cols, start_index=ind, val=True)
+		ind += 1
+		yield (imgs,labels)
+		if ind == num_batches:
+			ind = 0
 
 
 
-def load_images(size, rows, cols, val=False):
+
+
+def load_images(size, rows, cols, start_index, val=False):
 	x = np.zeros((size,rows,cols,3), dtype='uint8')
 	for i in range(size):
 		if val:
-			imgpath = img_data_dir + 'in_' + str(i+30000) + '.jpg.txt'
+			imgpath = img_data_dir + 'in_' + str((start_index * size + i)+30000) + '.jpg'
 		else:
-			imgpath = img_data_dir + 'in_' + str(i) + '.jpg'
+			imgpath = img_data_dir + 'in_' + str(start_index * size + i) + '.jpg'
+			# print(imgpath)
+		# print(imgpath)
+		# print("AAAAAAAAAAAAAAAAAAAA")
 		img = Image.open(imgpath)
 		x[i] = np.asarray(img,dtype='uint8')
 		i += 1
+	# print(i)
 	return x
 
 
-def load_labels(size, rows, cols, val=False):
+def load_labels(size, rows, cols, start_index, val=False):
 	y = np.zeros((size, rows, cols, len(char_array)), dtype='uint8')
 	for i in range(size):
 		if val:
-			labelpath = 'in_' + str(i+30000) + '.jpg.txt'
+			labelpath = 'in_' + str((start_index * size + i)+30000) + '.jpg.txt'
 		else:
-			labelpath = 'in_' + str(i) + '.jpg.txt'
+			labelpath = 'in_' + str(start_index * size + i) + '.jpg.txt'
+			# print(i)
+		# print('BBBBBBBBBBBBBBBBBBBBB')
+		# print(labelpath)
 		indices = text_to_ints(labelpath, rows, cols, val)
 		y[i] = np.eye(len(char_array))[indices]
 	return y
@@ -59,8 +82,10 @@ def load_labels(size, rows, cols, val=False):
 def text_to_ints(text, rows, cols, val):
 	if val:
 		textfile = open(val_data_dir + text)
+		# print(val_data_dir + text)
 	else:
 		textfile = open(ascii_data_dir + text)
+		# print(ascii_data_dir + text)
 	result = np.zeros((text_rows,text_cols), dtype='uint8')
 
 	row_index = 0
@@ -173,49 +198,49 @@ def get_class_weights(size=10000, rows=224, cols=224, targets=None):
 	# count_dict = {'M':0,'N':0,'H':0,'Q':0,'$':0,'O':0,'C':0,'?':0,'7':0,'>':0,'!':0,':':0,'-':0,';':0,'.':0,' ':0}
 
 
-def char_counts(size=10000, textrows=224, textcols=224, dims=16, labels=None):
-	# import imgdata as im 
-	if labels is None:
-		y_labels = load_labels(size,textrows,textcols)
-	else:
-		y_labels = labels 
+# def char_counts(size=10000, textrows=224, textcols=224, dims=16, labels=None):
+# 	# import imgdata as im 
+# 	if labels is None:
+# 		y_labels = load_labels(size,textrows,textcols)
+# 	else:
+# 		y_labels = labels 
 
-	y_labels = np.argmax(y_labels,axis=3)
-	total_characters = np.zeros((dims,))
+# 	y_labels = np.argmax(y_labels,axis=3)
+# 	total_characters = np.zeros((dims,))
 
-	for n, el in enumerate(y_labels):
-		label_name = 'in_' + str(2000 + n) + '.jpg'
-		label_path = ascii_data_dir + label_name
+# 	for n, el in enumerate(y_labels):
+# 		label_name = 'in_' + str(2000 + n) + '.jpg'
+# 		label_path = ascii_data_dir + label_name
 
-		y_labels[n] = get_label(label_path, textrows, textcols, dims)
+# 		y_labels[n] = get_label(label_path, textrows, textcols, dims)
 
-	flattened_labels = np.asarray(y_labels.flatten(), dtype='uint8')
+# 	flattened_labels = np.asarray(y_labels.flatten(), dtype='uint8')
 
-	for n, el in enumerate(flattened_labels):
-		total_characters[el] += 1
+# 	for n, el in enumerate(flattened_labels):
+# 		total_characters[el] += 1
 
-	print("#######################################################################")
-	print("TOTAL NUMBER OF CHARACTERS: " + str(np.sum(total_characters)))
-	print("#######################################################################")
-	print("NUMBER OF TIMES EACH CHARACTER HAS APPEARED")
-	print("M: " + str(total_characters[0]))
-	print("N: " + str(total_characters[1]))
-	print("H: " + str(total_characters[2]))
-	print("Q: " + str(total_characters[3]))
-	print("$: " + str(total_characters[4]))
-	print("O: " + str(total_characters[5]))
-	print("C: " + str(total_characters[6]))
-	print("?: " + str(total_characters[7]))
-	print("7: " + str(total_characters[8]))
-	print(">: " + str(total_characters[9]))
-	print("!: " + str(total_characters[10]))
-	print(":: " + str(total_characters[11]))
-	print("-: " + str(total_characters[12]))
-	print(";: " + str(total_characters[13]))
-	print(".: " + str(total_characters[14]))
-	print("SPACE: " + str(total_characters[15]))	
+# 	print("#######################################################################")
+# 	print("TOTAL NUMBER OF CHARACTERS: " + str(np.sum(total_characters)))
+# 	print("#######################################################################")
+# 	print("NUMBER OF TIMES EACH CHARACTER HAS APPEARED")
+# 	print("M: " + str(total_characters[0]))
+# 	print("N: " + str(total_characters[1]))
+# 	print("H: " + str(total_characters[2]))
+# 	print("Q: " + str(total_characters[3]))
+# 	print("$: " + str(total_characters[4]))
+# 	print("O: " + str(total_characters[5]))
+# 	print("C: " + str(total_characters[6]))
+# 	print("?: " + str(total_characters[7]))
+# 	print("7: " + str(total_characters[8]))
+# 	print(">: " + str(total_characters[9]))
+# 	print("!: " + str(total_characters[10]))
+# 	print(":: " + str(total_characters[11]))
+# 	print("-: " + str(total_characters[12]))
+# 	print(";: " + str(total_characters[13]))
+# 	print(".: " + str(total_characters[14]))
+# 	print("SPACE: " + str(total_characters[15]))	
 
-	return total_characters
+# 	return total_characters
 
 	
 def get_label(label_path,textrows,textcols,dims):

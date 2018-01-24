@@ -14,10 +14,16 @@ import matplotlib.mlab as mlab
 import matplotlib.pyplot as plt 
 import imgdata as im 
 from PIL import Image
+import os
+from constants import Constants 
+from sklearn.metrics import confusion_matrix
+
+const = Constants()
 
 img_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/rgb_in/img_celeba/'
 # ascii_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/ascii_out/'
 ascii_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/ssim_imgs/'
+val_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/ssim_imgs_val/'
 
 
 # def weighted_categorical_crossentropy(w):
@@ -33,10 +39,10 @@ char_array = np.asarray(['M','N','H','Q', '$', 'O','C', '?','7','>','!',':','-',
 char_dict = {'M':0,'N':1,'H':2,'Q':3,'$':4,'O':5,'C':6,'?':7,'7':8,'>':9,'!':10,':':11,'-':12,';':13,'.':14,' ':15}
 
 
-base_model = models.load_model('ascii_nn8.h5', custom_objects={'loss':loss})
+base_model = models.load_model('ascii_nn_gen.h5', custom_objects={'loss':loss})
 
 #Predicts ascii output of a given image
-def main(img_name='in_0.jpg'):
+def main(img_name='in_4.jpg'):
 	
 	img_path = img_data_dir + img_name
 	img = image.load_img(img_path, target_size=(224,224))
@@ -81,7 +87,7 @@ def get_patches(imgarray):
 
 
 #Gets per character accuracy of predicted output
-def per_char_acc(size=10000, imgrows=224, imgcols=224, textrows=224, textcols=224, dims=16):
+def per_char_acc(data, imgrows=224, imgcols=224, textrows=28, textcols=28, dims=16):
 	'''
 	Inputs:
 		size: number of examples to use
@@ -92,29 +98,53 @@ def per_char_acc(size=10000, imgrows=224, imgcols=224, textrows=224, textcols=22
 	Output: Per character, number of times a character was in the right place divided by the total number of characters
 
 	'''
+	#Training directory goes from 0-30000
+	#Validation directory goes from 30000-40000
+
+
+	if data is 'training':
+		directory = ascii_data_dir
+		size = const.train_set_size
+	elif data is 'validation':
+		directory = val_data_dir
+		size = const.val_set_size
+	elif data is 'overfitting':
+		directory = ascii_data_dir
+		size = 1
+
+	# size = len(os.listdir(directory))
 
 	x_eval = np.zeros((size,imgrows,imgcols,3))
 
-	y_pred = np.zeros((size,textrows,textcols))
+	# y_pred = np.zeros((size,textrows,textcols))
 	y_eval = np.zeros((size,textrows,textcols))
 
-	total_characters = np.zeros((dims,))
-	correct_characters = np.zeros((dims,))
+	total_characters = np.zeros((dims,), dtype='float32')
+	correct_characters = np.zeros((dims,), dtype='float32')
+
+	accs = np.zeros((dims,), dtype='float32')
 
 
 	for n, el in enumerate(y_eval):
-		img_name = 'in_' + str(2000 + n) + '.jpg'
+		if directory is ascii_data_dir and data is not 'overfitting':
+			img_name = 'in_' + str(n) + '.jpg'
+		elif directory is val_data_dir:
+			img_name = 'in_' + str(n+30000) + '.jpg'
+		elif directory is ascii_data_dir and data is 'overfitting':
+			img_name = 'in_4.jpg'
+
 		img_path = img_data_dir + img_name
-		label_path = ascii_data_dir + img_name + '.txt'
+		label_path = directory + img_name + '.txt'
 
-		img = np.asarray(Image.open(img_path), dtype='uint8')
+		img = np.asarray(Image.open(img_path), dtype='float32')
 		x_eval[n] = img 
-
 
 		img_label = get_label(label_path,textrows,textcols,dims)
 		y_eval[n] = img_label
 		
 	y_pred = base_model.predict(x_eval)
+	print("PREDICT SIZE:")
+	print(y_pred.shape)
 	y_pred = np.argmax(y_pred,axis=3)
 	
 
@@ -124,27 +154,50 @@ def per_char_acc(size=10000, imgrows=224, imgcols=224, textrows=224, textcols=22
 	for n,el in enumerate(flattened_labels):
 		total_characters[el] += 1
 
+	print('TOTAL CHARS')
+	print(total_characters)
+
 
 	for m,element in enumerate(char_array):
-
+		#Create a mask the same shape as the predicted labels, fill it with one element
 		mask = np.full((size,textrows,textcols), fill_value=m)
-
+		#Get array where elements of mask are the same as elements of labels and predictions
 		z = np.logical_and(np.equal(mask,y_eval), np.equal(mask,y_pred))
+		#Count the number of accurate predictions
 		a = np.sum(z == True)
-		print((a / total_characters[m]) * 100)
+
+		if m == 0:
+			print(z)
+			print(a)
+
+
+		# print((a / total_characters[m]) * 100)
+		accs[m] = a 
+
+	# print(y_pred.shape)
+
+	# print(y_pred)
+	# print(y_eval)
+	# print(y_eval.shape)
+	# print(confusion_matrix(y_pred[0],y_eval[0]))
+	accs = (accs / total_characters) * 100 
+	print(accs)
+	print(np.mean(accs))
+	return accs
 
 def char_counts(size=8000, textrows=224, textcols=224, dims=16):
-	y_labels = im.load_labels(size,textrows,textcols)
+	print('CHAR COUNTS')
+	y_labels = im.load_labels(size,textrows,textcols, start_index=0)
 
-	print(y_labels.shape)
-	print(np.argmax(y_labels, axis=3))
+	# print(y_labels.shape)
+	# print(np.argmax(y_labels, axis=3))
 	y_labels = np.argmax(y_labels,axis=3)
 
 	totals = [0] * dims
 	docs = [0] * dims
 
 	for n, el in enumerate(y_labels):
-		label_name = 'in_' + str(2000 + n) + '.jpg.txt'
+		label_name = 'in_' + str(n) + '.jpg.txt'
 		label_path = ascii_data_dir + label_name
 
 		y_labels[n] = get_label(label_path, textrows, textcols, dims)
@@ -209,14 +262,17 @@ def get_label(label_path,textrows,textcols,dims):
 	n = 0
 	m = 0 
 	acc = 0
+	# print(textrows)
+	# print(textcols)
 	for y,row in enumerate(f):
 		for x,col in enumerate(row):
 			acc+=1
 			if x % 28 == 0 and x is not 0:
 				n += 1
 				m = 0
-			if x == 64:
-				break
+			# if x == 64:
+			# 	print('WTF IS THIS')
+			# 	break
 			arr[n][m] = char_dict[col]
 			m += 1
 	return arr
@@ -241,3 +297,4 @@ def to_text(arr):
 	print(buff)
 
 # per_char_acc(size=8000, imgrows=224, imgcols=224, textrows=28, textcols=28)
+# per_char_acc('overfitting')

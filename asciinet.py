@@ -18,28 +18,34 @@ import imgdata
 # from sklearn.utils import class_weight
 # import loss
 import predict
-from itertools import product
-import something
-
-'''
-Dataset settings
-'''
-text_rows = 224
-text_cols = 224
-dims = 16
-
-img_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/rgb_in/img_celeba/'
-# ascii_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/ascii_out/'
-ascii_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/ssim_imgs/'
-
-char_array = np.asarray(['M','N','H','Q', '$', 'O','C', '?','7','>','!',':','-',';','.',' '])
-char_dict = {'M':0,'N':1,'H':2,'Q':3,'$':4,'O':5,'C':6,'?':7,'7':8,'>':9,'!':10,':':11,'-':12,';':13,'.':14,' ':15}
+# from itertools import product
+from constants import Constants
+import weighting
 
 
-def main(size=22000, split=1000, train_type='m'):
+'''Data constants'''
+const = Constants()
+img_data_dir = const.img_data_dir
+ascii_data_dir = const.ascii_data_dir
+val_data_dir = const.val_data_dir
+char_array = const.char_array
+char_dict = const.char_dict
+img_rows = const.img_rows
+img_cols = const.img_cols
+text_rows = const.text_rows
+text_cols = const.text_cols
+dims = const.char_count
+
+
+epoch_accuracies = []
+
+
+
+def main(size=22000, split=1000, train_type='g'):
 
 	#Get per character weights, use them for loss
-	weights = mfb()
+	'''CHANGE THIS BACK AFTER'''
+	weights = weighting.median_freq_balancing()
 	wcc = weighted_categorical_crossentropy(weights)
 	print('WEIGHTS: ' + str(weights))
 
@@ -53,13 +59,11 @@ def main(size=22000, split=1000, train_type='m'):
 	metrics=['accuracy']
 	)
 
-
+	#Read all data into memory, fit on that
 	if train_type is 'm':
 
 		(x_train, y_train) = imgdata.load_data(batch_size=size)
 		x_train = x_train.astype('float32')
-
-		
 
 		#Shuffle arrays.
 		# rng_state = np.random.get_state()
@@ -88,26 +92,29 @@ def main(size=22000, split=1000, train_type='m'):
 			)
 		model.save('ascii_nn8.h5')
 		get_results(history)
-		
+	
+	#Use generators 
 	elif train_type is 'g':
-		reduce_lr = ReduceLROnPlateau(monitor='loss', patience=3, min_lr=1e-4)
+		reduce_lr = ReduceLROnPlateau(monitor='val_loss', patience=5)
 		history = model.fit_generator(
-			use_generator(), 
-			steps_per_epoch=625, 
-			epochs=10, 
-			callbacks=[reduce_lr],
-			validation_data=val_generator(),
-			validation_steps=62
+			imgdata.load_data(batch_size=32, num_batches=937), 
+			steps_per_epoch=937,
+			epochs=20,
+			validation_data=imgdata.load_val_data(batch_size=32, num_batches=31),
+			validation_steps=31,
+			callbacks=[reduce_lr]
 			)
 		model.save('ascii_nn_gen.h5')
 		get_results(history)
+
+
 		
 
 
 def build_model(vgg_train=False):
 	input_tensor = Input(shape=(224,224,3))
 
-	vgg = VGG16(weights='imagenet', include_top=False, input_shape=(text_rows,text_cols,3))
+	vgg = VGG16(weights='imagenet', include_top=False, input_shape=(img_rows, img_cols,3))
 	# vgg.summary()
 
 	if vgg_train is False:
@@ -245,6 +252,7 @@ def get_results(history):
 def use_generator():
 	while True:
 		(x_train, y_train) = imgdata.load_data(batch_size=32)
+		print("GENERATED")
 		yield (x_train, y_train)
 
 def val_generator():
@@ -269,17 +277,6 @@ def mfb():
 	print("SUM OF CHARACTERS: ")
 	print(sum_total)
 
-	# print("NORMALIZED: ")
-	# total_counts /= sum_total
-	# print(total_counts)
-
-
-	# print("WEIGHTED: ")
-	# total_counts = 1. - total_counts
-
-	# print(total_counts)
-
-
 
 
 	freq_counts = total_counts / appearances
@@ -291,6 +288,7 @@ def mfb():
 	median_freqs = np.median(total_counts) / freq_counts
 
 	median_freqs /= np.sum(median_freqs)
+	median_freqs[0] * 3
 
 	
 	return median_freqs
@@ -301,9 +299,18 @@ def weighted_categorical_crossentropy(w):
     def loss(y_true, y_pred):
     	y_pred /= K.sum(y_pred, axis=-1, keepdims=True)
     	y_pred = K.clip(y_pred, K.epsilon(), 1 - K.epsilon())
-    	loss = y_true * K.log(y_pred) * w
+    	loss = y_true * K.log(y_pred) #* w
     	loss = -K.sum(loss, -1)
     	return loss
     return loss 
+
+
+
+def on_batch_end():
+	epoch_accuracies.append(predict.per_char_accs(size=20000,textrows=28,textcols=28))
+
+def on_epoch_end(self, epoch, logs=None):
+	print(K.eval(self.model.optimizer.lr))
+
 
 main(train_type='g')
