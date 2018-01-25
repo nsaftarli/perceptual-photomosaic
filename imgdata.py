@@ -22,7 +22,7 @@ text_cols = 28
 
 
 
-def load_data(num_batches, batch_size=32, img_rows=224, img_cols=224, txt_rows=28, txt_cols=28):
+def load_data(num_batches=32, batch_size=32, img_rows=224, img_cols=224, txt_rows=28, txt_cols=28):
 	ind = 0
 	while True:
 		imgs = load_images(batch_size, img_rows, img_cols, start_index=ind)
@@ -33,7 +33,7 @@ def load_data(num_batches, batch_size=32, img_rows=224, img_cols=224, txt_rows=2
 			ind = 0
 
 
-def load_val_data(num_batches, batch_size=32, img_rows=224, img_cols= 224, txt_rows=28, txt_cols=28):
+def load_val_data(num_batches=32, batch_size=32, img_rows=224, img_cols= 224, txt_rows=28, txt_cols=28):
 	ind = 0
 	while True:
 		imgs = load_images(batch_size, img_rows, img_cols, start_index=ind, val=True)

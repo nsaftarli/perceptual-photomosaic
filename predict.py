@@ -2,7 +2,7 @@ import tensorflow as tf
 from keras.backend.tensorflow_backend import set_session
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
-config.gpu_options.visible_device_list = "0"
+# config.gpu_options.visible_device_list = "0"
 set_session(tf.Session(config=config))
 
 from keras import models
@@ -40,15 +40,25 @@ char_dict = {'M':0,'N':1,'H':2,'Q':3,'$':4,'O':5,'C':6,'?':7,'7':8,'>':9,'!':10,
 
 
 base_model = models.load_model('ascii_nn_gen.h5', custom_objects={'loss':loss})
+# base_model.summary()
 
 #Predicts ascii output of a given image
-def main(img_name='in_4.jpg'):
+def main(directory='data', img_name='in_4.jpg'):
 	
-	img_path = img_data_dir + img_name
-	img = image.load_img(img_path, target_size=(224,224))
+	if directory is 'val':
+		img_path = img_data_dir + img_name
+	elif directory is 'here':
+		img_path = img_name
+	img = image.load_img(img_path)
 	x = image.img_to_array(img)
 	x = np.expand_dims(x, axis=0)
+	print(x.shape)
+
+	# get_output = K.function([base_model.layers[0].input], [base_model.layers[3].output])
+	# layer_output = get_output([x])[0]
+	print(layer_output.shape)
 	n = base_model.predict(x)
+	print(n.shape)
 	maxes = np.argmax(n,axis=3)
 	# print(maxes)
 	# print(maxes.shape)
@@ -61,6 +71,39 @@ def main(img_name='in_4.jpg'):
 				buff += char_array[col]
 			buff += '\n'
 	print(buff)
+
+def diagnostics(img_path='car.jpg', num=21):
+	img = image.load_img(img_path)
+	x = image.img_to_array(img)
+	x = np.expand_dims(x, axis=0)
+	print("INPUT SHAPE: " + str(x.shape))
+
+	inputs = []
+	outputs = []
+
+	get_layer_outputs = K.function([base_model.layers[0].input],[base_model.layers[i].output for i in range(num)])
+	get_layer_inputs = K.function([base_model.layers[0].input],[base_model.layers[i].input for i in range(num)])
+	# a = get_layer_outputs([x])[0]
+	inputs.append(get_layer_outputs([x])[i] for i in range(num))
+	print(inputs)
+	print("LAYER INPUTS: ")
+	for i in range(num):
+		layeri = get_layer_inputs([x])[i]
+		print(layeri.shape)
+	print('LAYER OUTPUTS: ')
+
+
+	for i in range(num):
+		layero = get_layer_outputs([x])[i]
+		print(layero.shape)
+	# for i,layer in enumerate(inputs):
+		# print("Layer " + str(i) + ": " + str(layer.shape))
+	# for i in 15:
+	# 	inputs.append(base_model.layers[i].input)
+	# 	outputs.append(base_model.layers[i].output)
+
+	# for i in 15:
+	# 	print(inpu)
 
 def get_patches(imgarray):
 	num_of_patches = 35

@@ -46,6 +46,7 @@ def main(size=22000, split=1000, train_type='g'):
 	#Get per character weights, use them for loss
 	'''CHANGE THIS BACK AFTER'''
 	weights = weighting.median_freq_balancing()
+	# weights = [1] * 16
 	wcc = weighted_categorical_crossentropy(weights)
 	print('WEIGHTS: ' + str(weights))
 
@@ -97,24 +98,35 @@ def main(size=22000, split=1000, train_type='g'):
 	elif train_type is 'g':
 		reduce_lr = ReduceLROnPlateau(monitor='val_loss', patience=5)
 		history = model.fit_generator(
-			imgdata.load_data(batch_size=32, num_batches=937), 
+			imgdata.load_data(num_batches=937,batch_size=32), 
 			steps_per_epoch=937,
-			epochs=20,
-			validation_data=imgdata.load_val_data(batch_size=32, num_batches=31),
+			epochs=40,
+			validation_data=imgdata.load_val_data(num_batches=31,batch_size=32),
 			validation_steps=31,
 			callbacks=[reduce_lr]
 			)
 		model.save('ascii_nn_gen.h5')
 		get_results(history)
 
+		# history = model.fit_generator(
+		# 	imgdata.load_data(num_batches=5,batch_size=32), 
+		# 	steps_per_epoch=5,
+		# 	epochs=2,
+		# 	validation_data=imgdata.load_val_data(batch_size=32),
+		# 	validation_steps=31
+		# 	)
+		# # model.summary()
+		# model.save('ascii_nn_gen.h5')
+		# get_results(history)
+
 
 		
 
 
 def build_model(vgg_train=False):
-	input_tensor = Input(shape=(224,224,3))
+	input_tensor = Input(shape=(None,None,3))
 
-	vgg = VGG16(weights='imagenet', include_top=False, input_shape=(img_rows, img_cols,3))
+	vgg = VGG16(weights='imagenet', include_top=False, input_shape=(None, None,3))
 	# vgg.summary()
 
 	if vgg_train is False:
