@@ -56,7 +56,7 @@ def main(directory='data', img_name='in_4.jpg'):
 
 	# get_output = K.function([base_model.layers[0].input], [base_model.layers[3].output])
 	# layer_output = get_output([x])[0]
-	print(layer_output.shape)
+	# print(layer_output.shape)
 	n = base_model.predict(x)
 	print(n.shape)
 	maxes = np.argmax(n,axis=3)
