@@ -69,7 +69,7 @@ def main(directory='here', img_name='emoji.png'):
 
 	# if new_height is not 0 and new_width is not 0:
 	# 	img = img.resize((new_width,new_height))
-	# img=img.resize((1024,1024))
+	img=img.resize((1024,1024))
 
 
 	x = image.img_to_array(img)
@@ -93,6 +93,8 @@ def main(directory='here', img_name='emoji.png'):
 				buff += char_array[col]
 			buff += '\n'
 	print(buff)
+	print(j)
+	print(i)
 
 def diagnostics(img_path='car.jpg', num=21):
 	img = image.load_img(img_path)

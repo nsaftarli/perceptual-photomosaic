@@ -4,7 +4,7 @@ from keras.models import Sequential, Model
 from keras import Input
 from keras.applications import VGG16
 from keras.preprocessing.image import ImageDataGenerator
-from keras.callbacks import ReduceLROnPlateau
+from keras.callbacks import ReduceLROnPlateau, LearningRateScheduler, TensorBoard, CSVLogger
 import keras.backend as K
 from keras.backend.tensorflow_backend import set_session
 
@@ -13,7 +13,7 @@ import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 import imgdata
-import predict
+# import predict
 from constants import Constants
 import weighting
 
@@ -40,6 +40,14 @@ epoch_accuracies = []
 
 
 
+def lr_sched(index):
+	if index < 2:
+		return 0.1
+	elif index >= 2 and index < 10:
+		return 0.01
+	else:
+		return 0.005
+
 def main(size=22000, split=1000, train_type='g'):
 
 	#Get per character weights, use them for loss
@@ -51,29 +59,33 @@ def main(size=22000, split=1000, train_type='g'):
 	model = build_model()
 	model.compile(
 		loss=wcc,
-		optimizer=optimizers.SGD(lr=0.01, momentum=0.9),
+		optimizer=optimizers.SGD(lr=0.1, momentum=0.9),
 		metrics=['accuracy']
 		)
 
 	#Use generators 
 	reduce_lr = ReduceLROnPlateau(monitor='val_loss', patience=5)
+	lr_schedule = LearningRateScheduler(lr_sched)
+	tf_board = TensorBoard(log_dir='./logs/Graph', histogram_freq=1, write_grads=True, write_images=True)
+	csv_log = CSVLogger('training.log')
 	history = model.fit_generator(
 		imgdata.load_data(num_batches=5937,batch_size=32), 
 		steps_per_epoch=5937,
-		epochs=5,
+		epochs=30,
 		validation_data=imgdata.load_val_data(num_batches=393,batch_size=32),
 		validation_steps=393,
-		callbacks=[reduce_lr]
+		callbacks=[lr_schedule,tf_board,csv_log]
 		)
 	model.save('ascii_nn_gen.h5')
 	get_results(history)
 
 	# history = model.fit_generator(
-	# 	imgdata.load_data(num_batches=5,batch_size=32), 
-	# 	steps_per_epoch=5,
-	# 	epochs=2,
+	# 	imgdata.load_data(num_batches=100,batch_size=32), 
+	# 	steps_per_epoch=100,
+	# 	epochs=10,
 	# 	validation_data=imgdata.load_val_data(batch_size=32),
-	# 	validation_steps=31
+	# 	validation_steps=31,
+	# 	callbacks=[tf_board]
 	# 	)
 	# # model.summary()
 	# model.save('ascii_nn_gen.h5')
@@ -222,12 +234,6 @@ def weighted_categorical_crossentropy(w):
     	return loss
     return loss 
 
-
-def on_batch_end():
-	epoch_accuracies.append(predict.per_char_accs(size=20000,textrows=28,textcols=28))
-
-def on_epoch_end(self, epoch, logs=None):
-	print(K.eval(self.model.optimizer.lr))
 
 
 main()
