@@ -24,3 +24,7 @@ __pycache__/
 
 #Test files
 tst.py
+
+#Logs
+logs/
+*.log

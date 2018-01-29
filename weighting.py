@@ -9,7 +9,7 @@ text_cols = const.text_cols
 train_set_size = const.train_set_size
 
 def median_freq_balancing():
-	total_counts, appearances = predict.char_counts(size=train_set_size, textrows=text_rows, textcols=text_cols)
+	total_counts, appearances = predict.char_counts(size=10000, textrows=text_rows, textcols=text_cols)
 	total_counts = np.asarray(total_counts, dtype='float32')
 	appearances = np.asarray(appearances, dtype='float32')
 
@@ -18,8 +18,6 @@ def median_freq_balancing():
 	freq_counts = total_counts / appearances
 	median_freqs = np.median(total_counts) / freq_counts
 	median_freqs /= np.sum(median_freqs)
-	#Force higher weighting for M by hand
-	# median_freqs[0] * 3
 
 
 	print("TOTAL COUNTS: ")
