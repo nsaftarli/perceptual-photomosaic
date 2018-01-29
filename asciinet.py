@@ -1,11 +1,3 @@
-import tensorflow as tf 
-from keras.backend.tensorflow_backend import set_session
-config = tf.ConfigProto()
-config.gpu_options.allow_growth = True
-set_session(tf.Session(config=config))
-
-import numpy as np
-import matplotlib.pyplot as plt
 from keras import optimizers
 from keras.layers import *
 from keras.models import Sequential, Model
@@ -14,14 +6,21 @@ from keras.applications import VGG16
 from keras.preprocessing.image import ImageDataGenerator
 from keras.callbacks import ReduceLROnPlateau
 import keras.backend as K
+from keras.backend.tensorflow_backend import set_session
+
+
+import tensorflow as tf 
+import numpy as np
+import matplotlib.pyplot as plt
 import imgdata
-# from sklearn.utils import class_weight
-# import loss
 import predict
-# from itertools import product
 from constants import Constants
 import weighting
 
+
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
+set_session(tf.Session(config=config))
 
 '''Data constants'''
 const = Constants()
@@ -44,80 +43,41 @@ epoch_accuracies = []
 def main(size=22000, split=1000, train_type='g'):
 
 	#Get per character weights, use them for loss
-	'''CHANGE THIS BACK AFTER'''
 	weights = weighting.median_freq_balancing()
 	# weights = [1] * 16
 	wcc = weighted_categorical_crossentropy(weights)
 	print('WEIGHTS: ' + str(weights))
 
-	#Create the model
 	model = build_model()
-
-	#Compile the model with our loss function
 	model.compile(
-	loss=wcc,
-	optimizer=optimizers.SGD(lr=0.1, momentum=0.9),
-	metrics=['accuracy']
-	)
+		loss=wcc,
+		optimizer=optimizers.SGD(lr=0.01, momentum=0.9),
+		metrics=['accuracy']
+		)
 
-	#Read all data into memory, fit on that
-	if train_type is 'm':
-
-		(x_train, y_train) = imgdata.load_data(batch_size=size)
-		x_train = x_train.astype('float32')
-
-		#Shuffle arrays.
-		# rng_state = np.random.get_state()
-		# np.random.shuffle(x_train)
-		# np.random.set_state(rng_state)
-		# np.random.shuffle(y_train)
-
-		#Split both into train/val/test sets
-		x_test = x_train[:split]
-		x_val = x_train[split:(2 * split)]
-		x_train = x_train[(2 * split):]
-
-		y_test = y_train[:split]
-		y_val = y_train[split:(2 * split)]
-		y_train = y_train[(2 * split):]
-
-		reduce_lr = ReduceLROnPlateau(monitor='val_loss', patience=3, min_lr=1e-3)
-
-		history = model.fit(
-			x_train, 
-			y_train, 
-			epochs=20, 
-			batch_size=32, 
-			validation_data=(x_val,y_val),
-			callbacks=[reduce_lr]
-			)
-		model.save('ascii_nn8.h5')
-		get_results(history)
-	
 	#Use generators 
-	elif train_type is 'g':
-		reduce_lr = ReduceLROnPlateau(monitor='val_loss', patience=5)
-		history = model.fit_generator(
-			imgdata.load_data(num_batches=937,batch_size=32), 
-			steps_per_epoch=937,
-			epochs=40,
-			validation_data=imgdata.load_val_data(num_batches=31,batch_size=32),
-			validation_steps=31,
-			callbacks=[reduce_lr]
-			)
-		model.save('ascii_nn_gen.h5')
-		get_results(history)
+	reduce_lr = ReduceLROnPlateau(monitor='val_loss', patience=5)
+	history = model.fit_generator(
+		imgdata.load_data(num_batches=5937,batch_size=32), 
+		steps_per_epoch=5937,
+		epochs=5,
+		validation_data=imgdata.load_val_data(num_batches=393,batch_size=32),
+		validation_steps=393,
+		callbacks=[reduce_lr]
+		)
+	model.save('ascii_nn_gen.h5')
+	get_results(history)
 
-		# history = model.fit_generator(
-		# 	imgdata.load_data(num_batches=5,batch_size=32), 
-		# 	steps_per_epoch=5,
-		# 	epochs=2,
-		# 	validation_data=imgdata.load_val_data(batch_size=32),
-		# 	validation_steps=31
-		# 	)
-		# # model.summary()
-		# model.save('ascii_nn_gen.h5')
-		# get_results(history)
+	# history = model.fit_generator(
+	# 	imgdata.load_data(num_batches=5,batch_size=32), 
+	# 	steps_per_epoch=5,
+	# 	epochs=2,
+	# 	validation_data=imgdata.load_val_data(batch_size=32),
+	# 	validation_steps=31
+	# 	)
+	# # model.summary()
+	# model.save('ascii_nn_gen.h5')
+	# get_results(history)
 
 
 		
@@ -127,10 +87,8 @@ def build_model(vgg_train=False):
 	input_tensor = Input(shape=(None,None,3))
 
 	vgg = VGG16(weights='imagenet', include_top=False, input_shape=(None, None,3))
-	# vgg.summary()
 
 	if vgg_train is False:
-		# Freeze VGG layers
 		for layer in vgg.layers:
 			layer.trainable = False
 
@@ -184,13 +142,12 @@ def build_model(vgg_train=False):
 	conv1 = Conv2D(512, 3, activation='relu', padding='same')(up1)
 	conv1 = Conv2D(512, 3, activation='relu', padding='same')(conv1)
 	conv1 = Conv2D(512, 3, activation='relu', padding='same')(conv1)
-	conv1 = add([conv1,o5])
+	# conv1 = add([conv1,o5])
 	batch1 = BatchNormalization()(conv1)
 
 
 	#Block 2
 	up2 = UpSampling2D()(batch1)
-
 	conv2 = Conv2D(512, 3, activation='relu', padding='same')(up2)
 	conv2 = Conv2D(512, 3, activation='relu', padding='same')(conv2)
 	conv2 = Conv2D(512, 3, activation='relu', padding='same')(conv2)
@@ -200,7 +157,6 @@ def build_model(vgg_train=False):
 
 	#Block 3
 	up3 = UpSampling2D()(batch2)
-
 	conv3 = Conv2D(256, 3, activation='relu', padding='same')(up3)
 	conv3 = Conv2D(256, 3, activation='relu', padding='same')(conv3)
 	conv3 = Conv2D(256, 3, activation='relu', padding='same')(conv3)
@@ -224,7 +180,6 @@ def build_model(vgg_train=False):
 	#Final prediction layer
 	soft5 = Conv2D(dims, kernel_size=8, strides=8, activation='softmax', padding='same')(batch5)
 
-
 	model = Model(input_tensor,soft5)
 	model.summary()
 
@@ -237,8 +192,6 @@ def get_results(history):
 	loss = history.history['loss']
 	val_loss = history.history['val_loss']
 
-
-
 	epochs = range(len(acc))
 
 	plt.figure(figsize=(10,10))
@@ -250,60 +203,13 @@ def get_results(history):
 	plt.legend()
 
 	plt.subplot(212)
-	# plt.subplots_adjust(top=2)
-
 	plt.plot(epochs,loss,'bo', label='Training Loss')
 	plt.plot(epochs,val_loss,'b', label='Validation Loss')
 	plt.title('Train/Val Loss')
 	plt.legend()
 
 	plt.savefig('latest_fig_gen.jpg')
-
 	plt.show()
-
-def use_generator():
-	while True:
-		(x_train, y_train) = imgdata.load_data(batch_size=32)
-		print("GENERATED")
-		yield (x_train, y_train)
-
-def val_generator():
-	while True:
-		(x_val, y_val) = imgdata.load_val_data()
-		yield (x_val, y_val)
-
-
-
-
-def mfb():
-	total_counts, appearances = predict.char_counts(size=20000,textrows=28,textcols=28)
-	total_counts = np.asarray(total_counts,dtype='float32')
-	appearances = np.asarray(appearances,dtype='float32')
-	print(total_counts.shape)
-	print(appearances.shape)
-	print("TOTAL COUNTS: ")
-	print(total_counts)
-
-
-	sum_total = np.sum(total_counts)
-	print("SUM OF CHARACTERS: ")
-	print(sum_total)
-
-
-
-	freq_counts = total_counts / appearances
-	print("FREQUENCY COUNTS: ")
-	print(freq_counts)
-
-
-
-	median_freqs = np.median(total_counts) / freq_counts
-
-	median_freqs /= np.sum(median_freqs)
-	median_freqs[0] * 3
-
-	
-	return median_freqs
 
 
 
@@ -317,7 +223,6 @@ def weighted_categorical_crossentropy(w):
     return loss 
 
 
-
 def on_batch_end():
 	epoch_accuracies.append(predict.per_char_accs(size=20000,textrows=28,textcols=28))
 
@@ -325,4 +230,4 @@ def on_epoch_end(self, epoch, logs=None):
 	print(K.eval(self.model.optimizer.lr))
 
 
-main(train_type='g')
+main()

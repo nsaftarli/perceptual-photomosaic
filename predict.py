@@ -20,10 +20,11 @@ from sklearn.metrics import confusion_matrix
 
 const = Constants()
 
-img_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/rgb_in/img_celeba/'
+img_data_dir = const.img_data_dir
 # ascii_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/ascii_out/'
-ascii_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/ssim_imgs/'
-val_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/ssim_imgs_val/'
+ascii_data_dir = const.ascii_data_dir
+val_data_dir = const.val_data_dir
+extra_data_dir = '/home/nsaftarl/Documents/ascii-art/non-resized/img_celeba/'
 
 
 # def weighted_categorical_crossentropy(w):
@@ -43,13 +44,34 @@ base_model = models.load_model('ascii_nn_gen.h5', custom_objects={'loss':loss})
 # base_model.summary()
 
 #Predicts ascii output of a given image
-def main(directory='data', img_name='in_4.jpg'):
+def main(directory='here', img_name='emoji.png'):
 	
 	if directory is 'val':
 		img_path = img_data_dir + img_name
 	elif directory is 'here':
 		img_path = img_name
+	elif directory is 'check':
+		img_path = extra_data_dir + img_name
 	img = image.load_img(img_path)
+
+	new_height = 0
+	new_width = 0
+
+	# if img.size[0] % 32 != 0 and img.size[1] % 32 != 0:
+	# 	for i,num in enumerate(const.img_sizes):
+	# 		if i == 0:
+	# 			continue
+	# 		else:
+	# 			if img.size[0] < num:
+	# 				new_width = const.img_sizes[i-1]
+	# 			if img.size[1] < num:
+	# 				new_height = const.img_sizes[i-1]
+
+	# if new_height is not 0 and new_width is not 0:
+	# 	img = img.resize((new_width,new_height))
+	# img=img.resize((1024,1024))
+
+
 	x = image.img_to_array(img)
 	x = np.expand_dims(x, axis=0)
 	print(x.shape)
@@ -172,7 +194,7 @@ def per_char_acc(data, imgrows=224, imgcols=224, textrows=28, textcols=28, dims=
 		if directory is ascii_data_dir and data is not 'overfitting':
 			img_name = 'in_' + str(n) + '.jpg'
 		elif directory is val_data_dir:
-			img_name = 'in_' + str(n+30000) + '.jpg'
+			img_name = 'in_' + str(n+190000) + '.jpg'
 		elif directory is ascii_data_dir and data is 'overfitting':
 			img_name = 'in_4.jpg'
 
