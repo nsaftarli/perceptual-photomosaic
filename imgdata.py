@@ -10,6 +10,7 @@ const = Constants()
 img_data_dir = const.img_data_dir
 # ascii_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/ascii_out/'
 ascii_data_dir = const.ascii_data_dir
+ascii_data_dir_flip = const.ascii_data_dir_flip
 val_data_dir = const.val_data_dir
 
 char_array = const.char_array
@@ -22,11 +23,13 @@ text_cols = 28
 
 
 
-def load_data(num_batches=32, batch_size=32, img_rows=224, img_cols=224, txt_rows=28, txt_cols=28):
+def load_data(num_batches=32, batch_size=32, img_rows=224, img_cols=224, txt_rows=28, txt_cols=28, flipped=True):
 	ind = 0
+
+
 	while True:
-		imgs = load_images(batch_size, img_rows, img_cols, start_index=ind)
-		labels = load_labels(batch_size, txt_rows, txt_cols, start_index=ind)
+		imgs = load_images(batch_size, img_rows, img_cols, start_index=ind, flip=flipped)
+		labels = load_labels(batch_size, txt_rows, txt_cols, start_index=ind, flip=flipped)
 		ind += 1
 		yield (imgs,labels)
 		if ind == num_batches:
@@ -47,36 +50,64 @@ def load_val_data(num_batches=32, batch_size=32, img_rows=224, img_cols= 224, tx
 
 
 
-def load_images(size, rows, cols, start_index, val=False):
+def load_images(size, rows, cols, start_index, val=False, flip=False):
 	x = np.zeros((size,rows,cols,3), dtype='uint8')
-	for i in range(size):
+
+	if flip:
+		count = size / 2
+	else:
+		count = size
+
+	for i in range(count):
 		if val:
 			imgpath = img_data_dir + 'in_' + str((start_index * size + i)+190000) + '.jpg'
 		else:
-			imgpath = img_data_dir + 'in_' + str(start_index * size + i) + '.jpg'
+			imgpath = img_data_dir + 'in_' + str(start_index * count + i) + '.jpg'
 		img = Image.open(imgpath)
 		x[i] = np.asarray(img,dtype='uint8')
-		i += 1
+
+
+		if flip:
+			img_f = img.transpose(Image.FLIP_LEFT_RIGHT)
+			x[i+count] = np.asarray(img_f,dtype='uint8')
+		# i += 1
 	return x
 
 
-def load_labels(size, rows, cols, start_index, val=False):
+def load_labels(size, rows, cols, start_index, val=False, flip=False):
 	y = np.zeros((size, rows, cols, len(char_array)), dtype='uint8')
-	for i in range(size):
+
+	if flip:
+		count = size / 2
+	else:
+		count = size
+
+	for i in range(count):
 		if val:
 			labelpath = 'in_' + str((start_index * size + i)+190000) + '.jpg.txt'
 		else:
-			labelpath = 'in_' + str(start_index * size + i) + '.jpg.txt'
+			labelpath = 'in_' + str(start_index * count + i) + '.jpg.txt'
+
 		indices = text_to_ints(labelpath, rows, cols, val)
 		y[i] = np.eye(len(char_array))[indices]
+
+		if flip:
+			labelpath_f = 'in_' + str(start_index * count + i) + '.jpg.txt'
+			indices_f = text_to_ints(labelpath_f,rows,cols,val,flip)
+			y[i+count] = np.eye(len(char_array))[indices_f]
+
 	return y
 
 
-def text_to_ints(text, rows, cols, val):
+def text_to_ints(text, rows, cols, val, flip=False):
 	if val:
 		textfile = open(val_data_dir + text)
+	elif flip:
+		textfile = open(ascii_data_dir_flip + text)
 	else:
 		textfile = open(ascii_data_dir + text)
+
+	# print(textfile)
 	result = np.zeros((text_rows,text_cols), dtype='uint8')
 
 	row_index = 0

@@ -1,10 +1,10 @@
 from keras import optimizers
 from keras.layers import *
-from keras.models import Sequential, Model
+from keras.models import Sequential, Model, load_model
 from keras import Input
 from keras.applications import VGG16
 from keras.preprocessing.image import ImageDataGenerator
-from keras.callbacks import ReduceLROnPlateau, LearningRateScheduler, TensorBoard, CSVLogger
+from keras.callbacks import ReduceLROnPlateau, LearningRateScheduler, TensorBoard, CSVLogger, ModelCheckpoint
 import keras.backend as K
 from keras.backend.tensorflow_backend import set_session
 
@@ -13,6 +13,7 @@ import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 import imgdata
+from ASCIIModel import ASCIIModel
 # import predict
 from constants import Constants
 import weighting
@@ -42,11 +43,24 @@ epoch_accuracies = []
 
 def lr_sched(index):
 	if index < 2:
-		return 0.1
-	elif index >= 2 and index < 10:
-		return 0.01
-	else:
-		return 0.005
+		return float(0.01)
+	elif index >= 5 and index < 10:
+		return  float(0.001)
+
+def train(model_path):
+	model = load_model(model_path)
+	reduce_lr = ReduceLROnPlateau(monitor='val_loss', patience=3)
+	lr_schedule = LearningRateScheduler(lr_sched)
+	tf_board = TensorBoard(log_dir='./logs/Graph')
+	csv_log = CSVLogger('training.log')
+	history = model.fit_generator(
+		imgdata.load_data(num_batches=11874,batch_size=32), 
+		steps_per_epoch=11874,
+		epochs=10,
+		validation_data=imgdata.load_val_data(num_batches=393,batch_size=32),
+		validation_steps=393,
+		callbacks=[reduce_lr,checkpoint]
+		)
 
 def main(size=22000, split=1000, train_type='g'):
 
@@ -56,25 +70,27 @@ def main(size=22000, split=1000, train_type='g'):
 	wcc = weighted_categorical_crossentropy(weights)
 	print('WEIGHTS: ' + str(weights))
 
+	# model = ASCIIModel(soft_depth=dims)
 	model = build_model()
 	model.compile(
 		loss=wcc,
-		optimizer=optimizers.SGD(lr=0.1, momentum=0.9),
+		optimizer=optimizers.SGD(lr=0.01, momentum=0.9),
 		metrics=['accuracy']
 		)
 
 	#Use generators 
-	reduce_lr = ReduceLROnPlateau(monitor='val_loss', patience=5)
+	checkpoint = ModelCheckpoint('ascii_nn_checkpt.h5')
+	reduce_lr = ReduceLROnPlateau(monitor='val_loss', patience=3)
 	lr_schedule = LearningRateScheduler(lr_sched)
-	tf_board = TensorBoard(log_dir='./logs/Graph', histogram_freq=1, write_grads=True, write_images=True)
+	tf_board = TensorBoard(log_dir='./logs/Graph')
 	csv_log = CSVLogger('training.log')
 	history = model.fit_generator(
-		imgdata.load_data(num_batches=5937,batch_size=32), 
-		steps_per_epoch=5937,
-		epochs=30,
+		imgdata.load_data(num_batches=11874,batch_size=32), 
+		steps_per_epoch=11874,
+		epochs=10,
 		validation_data=imgdata.load_val_data(num_batches=393,batch_size=32),
 		validation_steps=393,
-		callbacks=[lr_schedule,tf_board,csv_log]
+		callbacks=[lr_schedule,checkpoint]
 		)
 	model.save('ascii_nn_gen.h5')
 	get_results(history)
@@ -99,6 +115,34 @@ def build_model(vgg_train=False):
 	input_tensor = Input(shape=(None,None,3))
 
 	vgg = VGG16(weights='imagenet', include_top=False, input_shape=(None, None,3))
+
+
+	model = Conv2D(64,3,activation='relu', padding='same')(input_tensor)
+	model = Conv2D(64,3,activation='relu', padding='same')(model)
+	model = MaxPooling2D((2,2), strides=(2,2))(model)
+
+	model = Conv2D(128,3,activation='relu', padding='same')(model)
+	model = Conv2D(128,3,activation='relu', padding='same')(model)
+	model = MaxPooling2D((2,2), strides=(2,2))(model)
+
+	model = Conv2D(256,3,activation='relu',padding='same')(model)
+	model = Conv2D(256,3,activation='relu',padding='same')(model)
+	model = Conv2D(256,3,activation='relu',padding='same')(model)
+	model = MaxPooling2D((2,2), strides=(2,2))(model)
+
+	model = Conv2D(256,3,activation='relu',padding='same')(model)
+	model = Conv2D(256,3,activation='relu',padding='same')(model)
+	model = Conv2D(256,3,activation='relu',padding='same')(model)
+	model = MaxPooling2D((2,2), strides=(2,2))(model)
+
+	model = Conv2D(256,3,activation='relu',padding='same')(model)
+	model = Conv2D(256,3,activation='relu',padding='same')(model)
+	model = Conv2D(256,3,activation='relu',padding='same')(model)
+	model = MaxPooling2D((2,2), strides=(2,2))(model)
+
+
+
+
 
 	if vgg_train is False:
 		for layer in vgg.layers:
@@ -236,4 +280,4 @@ def weighted_categorical_crossentropy(w):
 
 
 
-main()
+# main()
