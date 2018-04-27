@@ -28,3 +28,7 @@ tst.py
 #Logs
 logs/
 *.log
+experiments/
+
+#Settings
+constants.py

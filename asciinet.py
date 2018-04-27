@@ -1,3 +1,7 @@
+import os
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+
 from keras import optimizers
 from keras.layers import *
 from keras.models import Sequential, Model, load_model
@@ -8,18 +12,19 @@ from keras.callbacks import ReduceLROnPlateau, LearningRateScheduler, TensorBoar
 import keras.backend as K
 from keras.backend.tensorflow_backend import set_session
 
-
-import tensorflow as tf 
+import datetime
+import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
-import imgdata
-from ASCIIModel import ASCIIModel
+import imdata
+import callbacks
+# from ASCIIModel import ASCIIModel
 # import predict
 from constants import Constants
 import weighting
 
 
-config = tf.ConfigProto()
+config = tf.ConfigProto(allow_soft_placement=True)
 config.gpu_options.allow_growth = True
 set_session(tf.Session(config=config))
 
@@ -35,38 +40,39 @@ img_cols = const.img_cols
 text_rows = const.text_rows
 text_cols = const.text_cols
 dims = const.char_count
+experiments_dir = const.experiments_dir
 
 
-epoch_accuracies = []
+'''Settings'''
+epochs=20
+lrate = 0.0000001
+batchsize = 8
+batches = 23750
+valbatches = 393
+flip=True
+
 
 
 
 def lr_sched(index):
-	if index < 2:
-		return float(0.01)
-	elif index >= 5 and index < 10:
-		return  float(0.001)
+	if index < 10:
+		return 0.0001
+	elif index >= 10 and index <  20:
+		return 0.00025
+	elif index > 20 and index < 30:
+		return 0.00001
+	else:
+		return  float(0.00000125)
 
-def train(model_path):
-	model = load_model(model_path)
-	reduce_lr = ReduceLROnPlateau(monitor='val_loss', patience=3)
-	lr_schedule = LearningRateScheduler(lr_sched)
-	tf_board = TensorBoard(log_dir='./logs/Graph')
-	csv_log = CSVLogger('training.log')
-	history = model.fit_generator(
-		imgdata.load_data(num_batches=11874,batch_size=32), 
-		steps_per_epoch=11874,
-		epochs=10,
-		validation_data=imgdata.load_val_data(num_batches=393,batch_size=32),
-		validation_steps=393,
-		callbacks=[reduce_lr,checkpoint]
-		)
 
-def main(size=22000, split=1000, train_type='g'):
+def main():
+	dt = datetime.datetime.now().strftime("%Y-%m-%d.%H:%M:%S")
+	path = experiments_dir + dt + '/'
 
 	#Get per character weights, use them for loss
 	weights = weighting.median_freq_balancing()
-	# weights = [1] * 16
+	# weights = weighting.plain_weighting()
+	# weights = np.asarray([1] * 16,dtype='float32')
 	wcc = weighted_categorical_crossentropy(weights)
 	print('WEIGHTS: ' + str(weights))
 
@@ -74,41 +80,43 @@ def main(size=22000, split=1000, train_type='g'):
 	model = build_model()
 	model.compile(
 		loss=wcc,
-		optimizer=optimizers.SGD(lr=0.01, momentum=0.9),
+		optimizer=optimizers.RMSprop(lr=lrate),
 		metrics=['accuracy']
 		)
 
-	#Use generators 
-	checkpoint = ModelCheckpoint('ascii_nn_checkpt.h5')
+	#Use generators
+	checkpoint = ModelCheckpoint(filepath=path + 'weights.{epoch:1d}.hdf5')
 	reduce_lr = ReduceLROnPlateau(monitor='val_loss', patience=3)
 	lr_schedule = LearningRateScheduler(lr_sched)
 	tf_board = TensorBoard(log_dir='./logs/Graph')
 	csv_log = CSVLogger('training.log')
+
+	logs_callback = callbacks.SettingLogs(logs={
+		'exp_file':path,
+		'epochs':epochs,
+		'lr':lrate,
+		'batch_size':batchsize,
+		'flip':flip, 
+		'weights':weights})
+
+	checkpath = path + 'ascii_nn_checkpt.h5'
+	char_acc_callback = callbacks.ClassAccs(logs={'model_dir':checkpath})
 	history = model.fit_generator(
-		imgdata.load_data(num_batches=11874,batch_size=32), 
-		steps_per_epoch=11874,
-		epochs=10,
-		validation_data=imgdata.load_val_data(num_batches=393,batch_size=32),
-		validation_steps=393,
-		callbacks=[lr_schedule,checkpoint]
+		imdata.load_data(num_batches=batches,batch_size=batchsize,flipped=flip,validation=False),
+		steps_per_epoch=batches,
+		epochs=30,
+		validation_data=imdata.load_data(num_batches=valbatches,batch_size=batchsize,flipped=False,validation=True),
+		validation_steps=valbatches,
+		callbacks=[checkpoint,logs_callback]
+
+
 		)
-	model.save('ascii_nn_gen.h5')
-	get_results(history)
 
-	# history = model.fit_generator(
-	# 	imgdata.load_data(num_batches=100,batch_size=32), 
-	# 	steps_per_epoch=100,
-	# 	epochs=10,
-	# 	validation_data=imgdata.load_val_data(batch_size=32),
-	# 	validation_steps=31,
-	# 	callbacks=[tf_board]
-	# 	)
-	# # model.summary()
-	# model.save('ascii_nn_gen.h5')
-	# get_results(history)
+	model.save(path + 'ascii_nn.h5')
+	get_results(history,path)
 
 
-		
+
 
 
 def build_model(vgg_train=False):
@@ -117,36 +125,36 @@ def build_model(vgg_train=False):
 	vgg = VGG16(weights='imagenet', include_top=False, input_shape=(None, None,3))
 
 
-	model = Conv2D(64,3,activation='relu', padding='same')(input_tensor)
-	model = Conv2D(64,3,activation='relu', padding='same')(model)
-	model = MaxPooling2D((2,2), strides=(2,2))(model)
+	# model = Conv2D(64,3,activation='relu', padding='same')(input_tensor)
+	# model = Conv2D(64,3,activation='relu', padding='same')(model)
+	# model = MaxPooling2D((2,2), strides=(2,2))(model)
 
-	model = Conv2D(128,3,activation='relu', padding='same')(model)
-	model = Conv2D(128,3,activation='relu', padding='same')(model)
-	model = MaxPooling2D((2,2), strides=(2,2))(model)
+	# model = Conv2D(128,3,activation='relu', padding='same')(model)
+	# model = Conv2D(128,3,activation='relu', padding='same')(model)
+	# model = MaxPooling2D((2,2), strides=(2,2))(model)
 
-	model = Conv2D(256,3,activation='relu',padding='same')(model)
-	model = Conv2D(256,3,activation='relu',padding='same')(model)
-	model = Conv2D(256,3,activation='relu',padding='same')(model)
-	model = MaxPooling2D((2,2), strides=(2,2))(model)
+	# model = Conv2D(256,3,activation='relu',padding='same')(model)
+	# model = Conv2D(256,3,activation='relu',padding='same')(model)
+	# model = Conv2D(256,3,activation='relu',padding='same')(model)
+	# model = MaxPooling2D((2,2), strides=(2,2))(model)
 
-	model = Conv2D(256,3,activation='relu',padding='same')(model)
-	model = Conv2D(256,3,activation='relu',padding='same')(model)
-	model = Conv2D(256,3,activation='relu',padding='same')(model)
-	model = MaxPooling2D((2,2), strides=(2,2))(model)
+	# model = Conv2D(256,3,activation='relu',padding='same')(model)
+	# model = Conv2D(256,3,activation='relu',padding='same')(model)
+	# model = Conv2D(256,3,activation='relu',padding='same')(model)
+	# model = MaxPooling2D((2,2), strides=(2,2))(model)
 
-	model = Conv2D(256,3,activation='relu',padding='same')(model)
-	model = Conv2D(256,3,activation='relu',padding='same')(model)
-	model = Conv2D(256,3,activation='relu',padding='same')(model)
-	model = MaxPooling2D((2,2), strides=(2,2))(model)
-
-
+	# model = Conv2D(256,3,activation='relu',padding='same')(model)
+	# model = Conv2D(256,3,activation='relu',padding='same')(model)
+	# model = Conv2D(256,3,activation='relu',padding='same')(model)
+	# model = MaxPooling2D((2,2), strides=(2,2))(model)
 
 
 
-	if vgg_train is False:
-		for layer in vgg.layers:
-			layer.trainable = False
+
+
+	# if vgg_train is False:
+	# 	for layer in vgg.layers:
+	# 		layer.trainable = False
 
 	l1_1 = Model.get_layer(vgg, 'block1_conv1')
 	l1_2 = Model.get_layer(vgg, 'block1_conv2')
@@ -194,47 +202,51 @@ def build_model(vgg_train=False):
 
 	#Decoder layers: VGG architecture in reverse with skip connections and dropout layers
 	#Block 1
-	up1 = UpSampling2D()(x)
-	conv1 = Conv2D(512, 3, activation='relu', padding='same')(up1)
-	conv1 = Conv2D(512, 3, activation='relu', padding='same')(conv1)
-	conv1 = Conv2D(512, 3, activation='relu', padding='same')(conv1)
-	# conv1 = add([conv1,o5])
-	batch1 = BatchNormalization()(conv1)
+	up1 = UpSampling2D(name='de_block1_up')(x)
+	conv1 = Conv2D(512, 3, activation='relu', padding='same', name='de_block1_conv1')(up1)
+	conv1 = Conv2D(512, 3, activation='relu', padding='same', name='de_block1_conv2')(conv1)
+	conv1 = Conv2D(512, 3, activation='relu', padding='same', name='de_block1_conv3')(conv1)
+	conv1 = add([conv1,o5])
+	batch1 = BatchNormalization(name='de_block1_batch')(conv1)
 
 
 	#Block 2
-	up2 = UpSampling2D()(batch1)
-	conv2 = Conv2D(512, 3, activation='relu', padding='same')(up2)
-	conv2 = Conv2D(512, 3, activation='relu', padding='same')(conv2)
-	conv2 = Conv2D(512, 3, activation='relu', padding='same')(conv2)
-	conv2 = add([conv2,o4])
-	batch2 = BatchNormalization()(conv2)
+	up2 = UpSampling2D(name='de_block2_up')(batch1)
+	conv2 = Conv2D(512, 3, activation='relu', padding='same', name='de_block2_conv1')(up2)
+	conv2 = Conv2D(512, 3, activation='relu', padding='same', name='de_block2_conv2')(conv2)
+	conv2 = Conv2D(512, 3, activation='relu', padding='same', name='de_block2_conv3')(conv2)
+	conv2 = add([conv2,o4], name='de_block2_add')
+	# drop2 =  Dropout(0.5, name='de_block2_drop')(conv2)
+	batch2 = BatchNormalization(name='de_block2_batch')(conv2)
 
 
 	#Block 3
-	up3 = UpSampling2D()(batch2)
-	conv3 = Conv2D(256, 3, activation='relu', padding='same')(up3)
-	conv3 = Conv2D(256, 3, activation='relu', padding='same')(conv3)
-	conv3 = Conv2D(256, 3, activation='relu', padding='same')(conv3)
-	conv3 = add([conv3,o3])
-	batch3 = BatchNormalization()(conv3)
+	up3 = UpSampling2D(name='de_block3_up')(batch2)
+	conv3 = Conv2D(256, 3, activation='relu', padding='same', name='de_block3_conv1')(up3)
+	conv3 = Conv2D(256, 3, activation='relu', padding='same', name='de_block3_conv2')(conv3)
+	conv3 = Conv2D(256, 3, activation='relu', padding='same', name='de_block3_conv3')(conv3)
+	conv3 = add([conv3,o3], name='de_block3_add')
+	# drop3 = Dropout(0.5, name='de_block3_drop')(conv3)
+	batch3 = BatchNormalization(name='de_block3_batch')(conv3)
 
 	#Block 4
-	up4 = UpSampling2D()(batch3)
-	conv4 = Conv2D(128, 3, activation='relu', padding='same')(up4)
-	conv4 = Conv2D(128, 3, activation='relu', padding='same')(conv4)
-	conv4 = add([conv4,o2])
-	batch4 = BatchNormalization()(conv4)
+	up4 = UpSampling2D(name='de_block4_up')(batch3)
+	conv4 = Conv2D(128, 3, activation='relu', padding='same', name='de_block4_conv1')(up4)
+	conv4 = Conv2D(128, 3, activation='relu', padding='same', name='de_block4_conv2')(conv4)
+	conv4 = add([conv4,o2], name='de_block4_add')
+	# drop4 = Dropout(0.5, name='de_block4_drop')(conv4)
+	batch4 = BatchNormalization(name='de_block4_batch')(conv4)
 
 	#Block 5
-	up5 = UpSampling2D()(batch4)
-	conv5 = Conv2D(64, 3, activation='relu', padding='same')(up5)
-	conv5 = Conv2D(64, 3, activation='relu', padding='same')(conv5)
-	conv5 = add([conv5,o1])
-	batch5 = BatchNormalization()(conv5)
+	up5 = UpSampling2D(name='de_block5_up')(batch4)
+	conv5 = Conv2D(64, 3, activation='relu', padding='same', name='de_block5_conv1')(up5)
+	conv5 = Conv2D(64, 3, activation='relu', padding='same', name='de_block5_conv2')(conv5)
+	conv5 = add([conv5,o1], name='de_block5_add')
+	# drop5 = Dropout(0.5, name='de_block_drop')(conv5)
+	batch5 = BatchNormalization(name='de_block5_batch')(conv5)
 
 	#Final prediction layer
-	soft5 = Conv2D(dims, kernel_size=8, strides=8, activation='softmax', padding='same')(batch5)
+	soft5 = Conv2D(dims, kernel_size=8, strides=8, activation='softmax', padding='same', name='de_block6_softmax')(batch5)
 
 	model = Model(input_tensor,soft5)
 	model.summary()
@@ -242,7 +254,7 @@ def build_model(vgg_train=False):
 	return model
 
 
-def get_results(history):
+def get_results(history,filepath):
 	acc = history.history['acc']
 	val_acc = history.history['val_acc']
 	loss = history.history['loss']
@@ -264,7 +276,7 @@ def get_results(history):
 	plt.title('Train/Val Loss')
 	plt.legend()
 
-	plt.savefig('latest_fig_gen.jpg')
+	plt.savefig(filepath + 'train_val_curve.jpg')
 	plt.show()
 
 
@@ -273,11 +285,11 @@ def weighted_categorical_crossentropy(w):
     def loss(y_true, y_pred):
     	y_pred /= K.sum(y_pred, axis=-1, keepdims=True)
     	y_pred = K.clip(y_pred, K.epsilon(), 1 - K.epsilon())
-    	loss = y_true * K.log(y_pred) #* w
+    	loss = y_true * K.log(y_pred) * w.T
     	loss = -K.sum(loss, -1)
     	return loss
-    return loss 
+    return loss
 
 
 
-# main()
+main()

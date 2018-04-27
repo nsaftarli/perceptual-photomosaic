@@ -1,3 +1,6 @@
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+
 import tensorflow as tf 
 from keras.backend.tensorflow_backend import set_session
 config = tf.ConfigProto()
@@ -40,11 +43,11 @@ char_array = np.asarray(['M','N','H','Q', '$', 'O','C', '?','7','>','!',':','-',
 char_dict = {'M':0,'N':1,'H':2,'Q':3,'$':4,'O':5,'C':6,'?':7,'7':8,'>':9,'!':10,':':11,'-':12,';':13,'.':14,' ':15}
 
 
-base_model = models.load_model('ascii_nn_gen.h5', custom_objects={'loss':loss})
+base_model = models.load_model('./experiments/2018-02-15.23:18:15/weights.9.hdf5', custom_objects={'loss':loss})
 # base_model.summary()
 
 #Predicts ascii output of a given image
-def main(directory='here', img_name='emoji.png'):
+def main(directory='here', img_name='a.png'):
 	
 	if directory is 'val':
 		img_path = img_data_dir + img_name
@@ -255,9 +258,6 @@ def per_char_acc(data, imgrows=224, imgcols=224, textrows=28, textcols=28, dims=
 def char_counts(size=8000, textrows=224, textcols=224, dims=16):
 	print('CHAR COUNTS')
 	y_labels = im.load_labels(size,textrows,textcols, start_index=0)
-
-	# print(y_labels.shape)
-	# print(np.argmax(y_labels, axis=3))
 	y_labels = np.argmax(y_labels,axis=3)
 
 	totals = [0] * dims
