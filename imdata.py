@@ -1,8 +1,8 @@
 import os 
 import numpy as np 
 from PIL import Image
-import matplotlib.mlab as mlab
-import matplotlib.pyplot as plt 
+# import matplotlib.mlab as mlab
+# import matplotlib.pyplot as plt 
 from constants import Constants
 
 const = Constants()
@@ -55,32 +55,31 @@ def load_data(
 
 			img = Image.open(imgpath)
 			x[i] = np.asarray(img,dtype='uint8')
-			# print("BBBBBBBBBBBBBBB")
-			# print(labelpath)
-			# print(imgpath)
 
-			txtfile = open(labelpath,'r')
-			labelarr = encode_label(txtfile,txt_rows,txt_cols,test)
-			y[i] = labelarr
+
+			# txtfile = open(labelpath,'r')
+			# labelarr = encode_label(txtfile,txt_rows,txt_cols,test)
+			# y[i] = labelarr
 
 			if flipped:
 				img = img.transpose(Image.FLIP_LEFT_RIGHT)
 				x[i + count] = np.asarray(img,dtype='uint8')
 
-				labelpath_f = flipped_data_dir + 'in_' + str(ind * count + i) + '.jpg.txt'
-				txtfile = open(labelpath_f,'r')
-				labelarr = encode_label(txtfile,txt_rows,txt_cols,test)
-				y[i + count] = labelarr
-			# print(labelpath)
-			# print(labelpath_f)
-			# print(validation)
-			# print(labelpath)
+				# labelpath_f = flipped_data_dir + 'in_' + str(ind * count + i) + '.jpg.txt'
+				# txtfile = open(labelpath_f,'r')
+				# labelarr = encode_label(txtfile,txt_rows,txt_cols,test)
+				# y[i + count] = labelarr
 		ind += 1
 
 		if test:
 			break
+		y = load_templates(batch_size)
+		# print(y.shape)
+		print(x.shape)
+		print(y.shape)
 
-		yield (x,y)
+		# yield (x,y)
+		yield [[x,y],x]
 
 
 def encode_label(text, rows, cols,test=False):
@@ -129,5 +128,19 @@ def ints_to_text(arr):
 
 
 
+def load_templates(batch_size):
+	path = './assets/char_set/'
+	images = np.zeros((batch_size,8,8,16))
+
+	for i in range(batch_size):
+		for j in range(16):
+			im = Image.open(path + str(j) + '.jpg').convert('L')
+			print(im.size)
+			print(np.asarray(im,dtype='uint8').shape)
+			images[i,:,:,j] = np.asarray(im,dtype='uint8')
+		# print(np.asarray(im,dtype='uint8').shape)
+
+
+	return images
 
 

@@ -3,10 +3,10 @@ import numpy as np
 class Constants:
 	def __init__(self):
 		# self.img_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/rgb_in/img_celeba/'
-		self.img_data_dir = '/media/ssd1/nsaftarl/rgb_in/img_celeba/'
+		self.img_data_dir = '/media/ssd480/nsaftarl/rgb_in/img_celeba/'
 		# self.ascii_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/ssim_imgs_train/'
-		self.ascii_data_dir = '/media/ssd1/nsaftarl/ssim_imgs_train/'
-		self.ascii_data_dir_flip = '/media/ssd1/nsaftarl/flipped_images/'
+		self.ascii_data_dir = '/media/ssd480/nsaftarl/ssim_imgs_train/'
+		self.ascii_data_dir_flip = '/media/ssd480/nsaftarl/flipped_images/'
 		self.val_data_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/ssim_imgs_val/'
 		self.experiments_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/experiments/'
 		self.weights_dir = '/home/nsaftarl/Documents/ascii-art/ASCIIArtNN/assets/weights/'

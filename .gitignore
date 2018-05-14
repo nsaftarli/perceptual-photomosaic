@@ -1,5 +1,6 @@
 env/
 .env/
+.env3/
 acc.txt
 2017-EC-Small-Cars-Mazda-3-hatchback.jpg
 ferrari-gtc4lusso.jpg
@@ -13,6 +14,7 @@ img2txt/
 #Data
 assets/
 __pycache__/
+weights/
 
 #Compiled python and existing models
 *.pyc
@@ -32,3 +34,4 @@ experiments/
 
 #Settings
 constants.py
+
