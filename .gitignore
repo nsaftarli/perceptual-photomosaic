@@ -15,6 +15,7 @@ img2txt/
 assets/
 __pycache__/
 weights/
+viz/
 
 #Compiled python and existing models
 *.pyc

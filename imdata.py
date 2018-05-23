@@ -4,6 +4,7 @@ from PIL import Image
 # import matplotlib.mlab as mlab
 # import matplotlib.pyplot as plt 
 from constants import Constants
+import tensorflow as tf 
 
 const = Constants()
 
@@ -73,13 +74,13 @@ def load_data(
 
 		if test:
 			break
-		y = load_templates(batch_size)
+		# y = load_templates(batch_size)
 		# print(y.shape)
-		print(x.shape)
-		print(y.shape)
+		# print(x.shape)
+		# print(y.shape)
 
-		# yield (x,y)
-		yield [[x,y],x]
+		yield (x)
+		# yield [[x,y],x]
 
 
 def encode_label(text, rows, cols,test=False):
@@ -135,8 +136,8 @@ def load_templates(batch_size):
 	for i in range(batch_size):
 		for j in range(16):
 			im = Image.open(path + str(j) + '.jpg').convert('L')
-			print(im.size)
-			print(np.asarray(im,dtype='uint8').shape)
+			# print(im.size)
+			# print(np.asarray(im,dtype='uint8').shape)
 			images[i,:,:,j] = np.asarray(im,dtype='uint8')
 		# print(np.asarray(im,dtype='uint8').shape)
 
@@ -144,3 +145,11 @@ def load_templates(batch_size):
 	return images
 
 
+def get_templates(path='./assets/char_set/', num_chars=16):
+	images = np.zeros((1,8,8,num_chars))
+
+	for j in range(num_chars):
+		im = Image.open(path + str(j) + '.png').convert('L')
+		images[0,:,:,j] = np.asarray(im,dtype='uint8')
+	# return tf.convert_to_tensor(images,tf.float32)
+	return images
