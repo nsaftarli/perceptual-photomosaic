@@ -2,6 +2,9 @@ import tensorflow as tf
 import numpy as np 
 from math import ceil
 
+from layers import *
+
+
 VGG_MEAN = [103.939, 116.779, 123.68]
 NUM_TEMPLATES = 16
 PATCH_SIZE=8
@@ -9,11 +12,8 @@ IM_SHAPE = 224
 
 class ASCIINet:
 
-	def __init__(self, images, templates, weight_path='./weights/vgg16.npy',batch_size=32):
+	def __init__(self, images, templates, weight_path='./weights/vgg16.npy',batch_size=1):
 		self.vgg_weights = np.load(weight_path, encoding='latin1').item()
-		print(images)
-		print(templates)
-
 		self.vgg = self.build_network(images,templates,batch_size=batch_size)
 
 
@@ -23,95 +23,114 @@ class ASCIINet:
 
 		r,g,b = tf.split(self.input, 3, axis=3)
 		self.vgg_input = tf.concat([
-			r - VGG_MEAN[0],
+			b - VGG_MEAN[0],
 			g - VGG_MEAN[1],
-			b - VGG_MEAN[2]], axis=3) 
-
-
-		# self.max_val = tf.reduce_max(self.gray_im,axis=-1)
-		# self.min_val = tf.reduce_min(self.gray_im, axis=-1)
+			r - VGG_MEAN[2]], axis=3) 
 
 		#Encoder (VGG16 by default)
-		self.conv1_1 = self.ConvLayer(self.vgg_input, name='conv1_1', trainable=False)
-		self.conv1_2 = self.ConvLayer(self.conv1_1, name='conv1_2', trainable=False)
-		self.pool1 = self.PoolLayer(self.conv1_2, name='pool1', trainable=False)
+		self.conv1_1,_ = ConvLayer(self.vgg_input, name='conv1_1', trainable=False)
+		self.conv1_2,_ = ConvLayer(self.conv1_1, name='conv1_2', trainable=False)
+		self.pool1 = PoolLayer(self.conv1_2, name='pool1', trainable=False)
 
-		self.conv2_1 = self.ConvLayer(self.pool1, name='conv2_1', trainable=False)
-		self.conv2_2 = self.ConvLayer(self.conv2_1, name='conv2_2', trainable=False)
-		self.pool2 = self.PoolLayer(self.conv2_2, name='pool2', trainable=False)
+		self.conv2_1,_ = ConvLayer(self.pool1, name='conv2_1', trainable=False)
+		self.conv2_2,_ = ConvLayer(self.conv2_1, name='conv2_2', trainable=False)
+		self.pool2 = PoolLayer(self.conv2_2, name='pool2', trainable=False)
 
-		self.conv3_1 = self.ConvLayer(self.pool2, name='conv3_1', trainable=False)
-		self.conv3_2 = self.ConvLayer(self.conv3_1, name='conv3_2', trainable=False)
-		self.conv3_3 = self.ConvLayer(self.conv3_2, name='conv3_3', trainable=False)
-		self.pool3 = self.PoolLayer(self.conv3_3, name='pool3', trainable=False)
 
-		self.conv4_1 = self.ConvLayer(self.pool3, name='conv4_1', trainable=False)
-		self.conv4_2 = self.ConvLayer(self.conv4_1, name='conv4_2', trainable=False)
-		self.conv4_3 = self.ConvLayer(self.conv4_2, name='conv4_3', trainable=False)
-		self.pool4 = self.PoolLayer(self.conv4_3, name='pool4', trainable=False)
+		self.conv3_1,_ = ConvLayer(self.pool2, name='conv3_1', trainable=False)
+		self.conv3_2,_ = ConvLayer(self.conv3_1, name='conv3_2', trainable=False)
+		self.conv3_3,_ = ConvLayer(self.conv3_2, name='conv3_3', trainable=False)
+		self.pool3 = PoolLayer(self.conv3_3, name='pool3', trainable=False)
 
-		self.conv5_1 = self.ConvLayer(self.pool4, name='conv5_1', trainable=False)
-		self.conv5_2 = self.ConvLayer(self.conv5_1, name='conv5_2', trainable=False)
-		self.conv5_3 = self.ConvLayer(self.conv5_2, name='conv5_3', trainable=False)
-		self.pool5 = self.PoolLayer(self.conv5_3, name='pool5', trainable=False)
+
+		self.conv4_1,_ = ConvLayer(self.pool3, name='conv4_1', trainable=False)
+		self.conv4_2,_ = ConvLayer(self.conv4_1, name='conv4_2', trainable=False)
+		self.conv4_3,_ = ConvLayer(self.conv4_2, name='conv4_3', trainable=False)
+		self.pool4 = PoolLayer(self.conv4_3, name='pool4', trainable=False)
+
+
+		self.conv5_1,_ = ConvLayer(self.pool4, name='conv5_1', trainable=False)
+		self.conv5_2,_ = ConvLayer(self.conv5_1, name='conv5_2', trainable=False)
+		self.conv5_3,self.w2 = ConvLayer(self.conv5_2, name='conv5_3', trainable=False)
+		self.pool5 = PoolLayer(self.conv5_3, name='pool5', trainable=False)
 
 		#Decoder
-		self.up6 = self.UpSampleLayer(self.pool5,scale_factor=2,name='up6')
-		self.conv6_1 = self.ConvLayer(self.up6, name='conv6_1', layer_type='Decoder', out_channels=512)
-		self.conv6_2 = self.ConvLayer(self.conv6_1, name='conv6_2', layer_type='Decoder', out_channels=512)
-		self.conv6_3 = self.ConvLayer(self.conv6_2, name='conv6_3', layer_type='Decoder', out_channels=512)
+		self.up6 = UpSampleLayer(self.pool5,scale_factor=2,name='up6')
+		self.conv6_1,_ = ConvLayer(self.up6, name='conv6_1', layer_type='Decoder', out_channels=512)
+		self.conv6_2,_ = ConvLayer(self.conv6_1, name='conv6_2', layer_type='Decoder', out_channels=512)
+		self.conv6_3,_ = ConvLayer(self.conv6_2, name='conv6_3', layer_type='Decoder', out_channels=512)
 		self.add6 = tf.add(self.conv6_3,self.conv5_3, name='add6')
+		self.batch6 = batch_norm_layer(self.add6)
 
-		self.up7 = self.UpSampleLayer(self.add6,scale_factor=2,name='up7')
-		self.conv7_1 = self.ConvLayer(self.up7, name='conv7_1', layer_type='Decoder', out_channels=512)
-		self.conv7_2 = self.ConvLayer(self.conv7_1, name='conv7_2', layer_type='Decoder', out_channels=512)
-		self.conv7_3 = self.ConvLayer(self.conv7_2, name='conv7_3', layer_type='Decoder', out_channels=512)
+
+		self.up7 = UpSampleLayer(self.batch6,scale_factor=2,name='up7')
+		self.conv7_1,_ = ConvLayer(self.up7, name='conv7_1', layer_type='Decoder', out_channels=512)
+		self.conv7_2,_ = ConvLayer(self.conv7_1, name='conv7_2', layer_type='Decoder', out_channels=512)
+		self.conv7_3,_ = ConvLayer(self.conv7_2, name='conv7_3', layer_type='Decoder', out_channels=512)
 		self.add7 = tf.add(self.conv7_3, self.conv4_3, name='add7')
+		self.batch7 = batch_norm_layer(self.add7)
 
-		self.up8 = self.UpSampleLayer(self.add7,scale_factor=2,name='up8')
-		self.conv8_1 = self.ConvLayer(self.up8, name='conv8_1', layer_type='Decoder', out_channels=256)
-		self.conv8_2 = self.ConvLayer(self.conv8_1, name='conv8_2', layer_type='Decoder', out_channels=256)
-		self.conv8_3 = self.ConvLayer(self.conv8_2, name='conv8_3', layer_type='Decoder', out_channels=256)
+
+		self.up8 = UpSampleLayer(self.batch7,scale_factor=2,name='up8')
+		self.conv8_1,_ = ConvLayer(self.up8, name='conv8_1', layer_type='Decoder', out_channels=256)
+		self.conv8_2,_ = ConvLayer(self.conv8_1, name='conv8_2', layer_type='Decoder', out_channels=256)
+		self.conv8_3,_ = ConvLayer(self.conv8_2, name='conv8_3', layer_type='Decoder', out_channels=256)
 		self.add8 = tf.add(self.conv8_3, self.conv3_3, name='add8')
+		self.batch8 = batch_norm_layer(self.add8)
 
-		self.up9 = self.UpSampleLayer(self.add8,scale_factor=2,name='up9')
-		self.conv9_1 = self.ConvLayer(self.up9, name='conv9_1', layer_type='Decoder', out_channels=128)
-		self.conv9_2 = self.ConvLayer(self.conv9_1, name='conv9_2', layer_type='Decoder', out_channels=128)
+
+		self.up9 = UpSampleLayer(self.batch8,scale_factor=2,name='up9')
+		self.conv9_1,_ = ConvLayer(self.up9, name='conv9_1', layer_type='Decoder', out_channels=128)
+		self.conv9_2,_ = ConvLayer(self.conv9_1, name='conv9_2', layer_type='Decoder', out_channels=128)
 		self.add9 = tf.add(self.conv9_2, self.conv2_2, name='add9')
+		self.batch9 = batch_norm_layer(self.add9)
 
-		self.up10 = self.UpSampleLayer(self.add9,scale_factor=2,name='up10')
-		self.conv10_1 = self.ConvLayer(self.up10, name='conv10_1', layer_type='Decoder', out_channels=64)
-		self.conv10_2 = self.ConvLayer(self.conv10_1, name='conv10_2', layer_type='Decoder', out_channels=64)
+
+		self.up10 = UpSampleLayer(self.batch9,scale_factor=2,name='up10')
+		self.conv10_1,_ = ConvLayer(self.up10, name='conv10_1', layer_type='Decoder', out_channels=64)
+		self.conv10_2, _ = ConvLayer(self.conv10_1, name='conv10_2', layer_type='Decoder', out_channels=64)
 		self.add10 = tf.add(self.conv10_2, self.conv1_2, name='add10')
+		self.batch10 = batch_norm_layer(self.add10)
 
-		self.softmax = self.ConvLayer(self.add10, name='softmax', layer_type='Softmax', out_channels=NUM_TEMPLATES)
+		with tf.variable_scope('abc',reuse=tf.AUTO_REUSE):
+			self.w2 = tf.get_variable('w',initializer=tf.constant(5.0,dtype=tf.float32))
 
-		self.flat_softmax = tf.reshape(self.softmax,
-			shape=tf.convert_to_tensor([1, 1, NUM_TEMPLATES, batch_size * self.softmax.get_shape()[1].value * self.softmax.get_shape()[2].value], dtype=tf.int32),
-			name='flat_softmax')
 
-		self.template_tensor = self.TemplateLayer(templates,rgb=False)
-		print(self.template_tensor)
+		# self.batch10 = batch_norm_layer(self.add10)
 
-		# self.conv11 = tf.nn.conv2d(self.template_tensor,self.flat_softmax,strides=[1,1,1,1],padding='SAME',name='conv11')
-		self.conv11 = tf.nn.conv2d(self.flat_softmax,self.template_tensor,strides=[1,1,1,1],padding='SAME',name='conv11')
+		self.temp = tf.placeholder(tf.float32,shape=[])
 
-		self.output = tf.reshape(self.conv11,shape=[batch_size, IM_SHAPE, IM_SHAPE, 1], name='output')
+		self.conv11, self.w = ConvLayer(self.add10, name='softmax', layer_type='Softmax', out_channels=NUM_TEMPLATES, patch_size=PATCH_SIZE)
 
-		# self.conv11 = tf.reshape(
-		# 	tf.nn.conv2d(self.template_tensor,self.flat_softmax,strides=[1,1,1,1],padding='SAME'),
-		# 	shape=[batch_size, IM_SHAPE, IM_SHAPE], name='conv11')
+		self.conv11 = self.conv11 * self.temp
 
-		# self.tloss = self.ToyLoss(self.gray_im,self.conv11)
+		self.softmax = tf.exp(self.conv11) / tf.reduce_sum(tf.exp(self.conv11), axis=-1, keep_dims=True)
+
+		self.template_tensor = TemplateLayer(templates,rgb=False)
+
+		reshaped_templates = tf.transpose(tf.reshape(self.template_tensor,[-1, PATCH_SIZE ** 2, NUM_TEMPLATES]),perm=[0,2,1])
+		reshaped_softmax = tf.reshape(self.softmax,[-1, (IM_SHAPE//PATCH_SIZE) ** 2, 16])
+
+		self.output = tf.matmul(reshaped_softmax,reshaped_templates)
+
+		self.reshaped_output = tf.reshape(tf.transpose(tf.reshape(
+			self.output, [batch_size,28,28,8,8]),
+			perm=[0,1,3,2,4]), [batch_size,224,224,1])
+
+		##################Regularizers#####################################
+		self.entropy = EntropyRegularizer(self.softmax)
+		self.variance = VarianceRegularizer(self.softmax)
+		###########################################################
+
 		self.build_summaries()
 
 
-		self.print_architecture()
+		# self.print_architecture()
 
 
 	def build_summaries(self):
 		tf.summary.image('target', self.gray_im, max_outputs=1)
-		tf.summary.image('output', self.output, max_outputs=1)
+		tf.summary.image('output', self.reshaped_output, max_outputs=1)
 		for i in range(16):
 			tf.summary.image('templates', self.template_tensor[..., i:i+1])
 		with tf.variable_scope('conv1_1', reuse=True):
@@ -120,56 +139,64 @@ class ASCIINet:
 		with tf.variable_scope('conv6_1', reuse=True):
 			conv6_1_weights = tf.get_variable('weight')
 			tf.summary.scalar('conv6_1', tf.reduce_mean(conv6_1_weights))
+
+		with tf.variable_scope('softmax', reuse=True):
+			softmax_weights = tf.get_variable('weight')
+			tf.summary.histogram('weight',softmax_weights)
+		with tf.variable_scope('add10',reuse=True):
+			tf.summary.histogram('add10',self.add10)
+
+		with tf.variable_scope('conv6_2', reuse=True):
+			conv6_2_weights = tf.get_variable('weight')
+			tf.summary.scalar('conv6_2', tf.reduce_mean(conv6_2_weights))
+
+		with tf.variable_scope('conv6_2', reuse=True):
+			conv6_2_biases = tf.get_variable('bias')
+			tf.summary.scalar('conv6_2_b', tf.reduce_mean(conv6_2_biases))
+
+
+		for i,el in enumerate(tf.get_collection('pre-act')):
+			print(el)
+			el_mean = tf.reduce_mean(el[0,:,:,:])
+
+
+			if i == 26 :
+				tf.summary.scalar('final_encoder_pre',el_mean)
+
+
+
+
+		for i,el in enumerate(tf.get_collection('activations')):
+			print(el)
+			el_mean = tf.reduce_mean(el[0,:,:,:])
+
+			if i == 26 :
+				tf.summary.scalar('final_encoder_act',el_mean)
+
+
+		for i,el in enumerate(tf.get_collection('conv_biases')):
+			print(el)
+			el_mean = tf.reduce_mean(el)
+
+			if i == 26 :
+				tf.summary.scalar('final_encoder_bias',el_mean)
+
+		for i,el in enumerate(tf.get_collection('conv_weights')):
+			print(el)
+			el_mean = tf.reduce_mean(el)
+
+			if i == 26 :
+				tf.summary.scalar('final_encoder_weight',el_mean)
+
+
+		tf.summary.scalar('entropy',self.entropy)
+		tf.summary.scalar('variance',self.variance)
+		tf.summary.scalar('temperature',self.temp)
+
+
+
+
 		self.summaries = tf.summary.merge_all()
-
-
-
-	def TemplateLayer(self,templates, rgb=False):
-		return tf.constant(value=templates, dtype=tf.float32, shape=templates.shape, name='templates')
-
-
-	def ConvLayer(self,x,name,layer_type='VGG16',out_channels=None, trainable=True):
-		if layer_type == 'VGG16':
-			with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
-				w = self.get_vgg_weights(name, trainable=trainable)
-				b = self.get_vgg_biases(name, trainable=trainable)
-				z = tf.nn.conv2d(x,w, [1,1,1,1],padding='SAME')
-				z = z + b 
-				return tf.nn.relu(z)
-		elif layer_type == 'Softmax':
-			with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
-				in_channels = x.get_shape()[3].value
-				shape_in = [PATCH_SIZE, PATCH_SIZE, in_channels, NUM_TEMPLATES]
-				w = tf.get_variable('weight', initializer=tf.truncated_normal(shape_in), trainable=trainable)
-				b = tf.get_variable('bias', initializer=tf.constant(0.0,dtype=tf.float32), trainable=trainable)
-				return tf.nn.softmax(tf.nn.conv2d(
-					x,w,strides=[1, PATCH_SIZE, PATCH_SIZE, 1], padding='SAME') + b)
-		else:
-			with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
-				in_channels = x.get_shape()[3].value
-				shape_in = [3,3, in_channels, out_channels]
-				w = tf.get_variable('weight',initializer=tf.truncated_normal(shape_in), trainable=trainable)
-				b = tf.get_variable('bias',initializer=tf.constant(0.0,dtype=tf.float32), trainable=trainable)
-				return tf.nn.relu(tf.nn.conv2d(
-					x,w,strides=[1,1,1,1],padding='SAME')+b)
-
-	def PoolLayer(self, x, name, trainable=True):
-		return tf.nn.max_pool(x, ksize=[1,2,2,1], strides=[1,2,2,1], padding='SAME', name=name)
-
-
-	def UpSampleLayer(self,x,scale_factor,name):
-		with tf.variable_scope(name):
-			in_shape = x.get_shape()
-			upsampled = tf.image.resize_images(x,
-				size=[in_shape[1].value * scale_factor, in_shape[2].value * scale_factor])
-			return upsampled
-
-	def get_vgg_weights(self, name, trainable):
-		return tf.get_variable(initializer=self.vgg_weights[name][0], name='filter', trainable=trainable)
-
-
-	def get_vgg_biases(self, name, trainable):
-		return tf.get_variable(initializer=self.vgg_weights[name][1], name='biases', trainable=trainable)
 
 
 	def DenseLayer(self,x,name):
@@ -230,6 +257,8 @@ class ASCIINet:
 		print(self.conv11.get_shape())
 		# print(self.tloss.get_shape())
 		print(tf.trainable_variables())
+
+
 
 if __name__ == '__main__':
 	m = ASCIINet()

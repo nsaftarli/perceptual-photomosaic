@@ -3,7 +3,8 @@ import numpy as np
 from PIL import Image
 # import matplotlib.mlab as mlab
 # import matplotlib.pyplot as plt 
-from constants import Constants
+# from constants import Constants
+from utils.constants import Constants
 import tensorflow as tf 
 
 const = Constants()
@@ -12,16 +13,14 @@ img_data_dir = const.img_data_dir
 ascii_data_dir = const.ascii_data_dir
 flipped_data_dir = const.ascii_data_dir_flip
 val_data_dir = const.val_data_dir
-
 char_array = const.char_array
 char_dict = const.char_dict
-
 train_set_size = const.train_set_size
 
 
 def load_data(
 	num_batches=32, 
-	batch_size=32, 
+	batch_size=1, 
 	img_rows=224, 
 	img_cols=224, 
 	txt_rows=28, 
@@ -149,7 +148,10 @@ def get_templates(path='./assets/char_set/', num_chars=16):
 	images = np.zeros((1,8,8,num_chars))
 
 	for j in range(num_chars):
-		im = Image.open(path + str(j) + '.png').convert('L')
-		images[0,:,:,j] = np.asarray(im,dtype='uint8')
+		# im = Image.open(path + str(j) + '.png').convert('L')
+		# images[0,:,:,j] = np.asarray(im,dtype='uint8')
+		im = Image.open(path + str(j) + '.png')
+		im = np.asarray(im,dtype='uint8')
+		images[0,:,:,j] = np.mean(im,axis=-1)
 	# return tf.convert_to_tensor(images,tf.float32)
 	return images
