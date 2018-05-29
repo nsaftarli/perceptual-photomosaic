@@ -8,7 +8,6 @@ vgg_weights = np.load('./weights/vgg16.npy',encoding='latin1').item()
 def ConvLayer(x,name,ksize=3,layer_type='VGG16',out_channels=None, trainable=True, patch_size=None):
 
 	in_channels = x.get_shape()[3].value
-	shape_in = [ksize,ksize,in_channels,out_channels]
 
 	with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
 		if layer_type == 'VGG16':
@@ -25,10 +24,9 @@ def ConvLayer(x,name,ksize=3,layer_type='VGG16',out_channels=None, trainable=Tru
 			b = tf.get_variable('bias', initializer=tf.constant(0.0, shape=[out_channels], dtype=tf.float32), trainable=trainable)
 			z = tf.nn.conv2d(x, w, strides=[1,patch_size,patch_size,1], padding='SAME') + b
 
-
-			zmax = tf.reduce_max(z, axis=-1, keep_dims=True)
-			zmin = tf.reduce_min(z, axis=-1, keep_dims=True)
-			z = ((z-zmin)/(zmax-zmin))+1
+			# zmax = tf.reduce_max(z, axis=-1, keep_dims=True)
+			# zmin = tf.reduce_min(z, axis=-1, keep_dims=True)
+			# z = ((z-zmin)/(zmax-zmin))+1
 
 			return z,w
 
@@ -36,6 +34,7 @@ def ConvLayer(x,name,ksize=3,layer_type='VGG16',out_channels=None, trainable=Tru
 
 
 		else:
+			shape_in = [ksize,ksize,in_channels,out_channels]
 			w = tf.get_variable('weight', initializer=tf.contrib.layers.xavier_initializer(), shape=shape_in, trainable=trainable)
 			b = tf.get_variable('bias',  initializer=tf.constant(0.0,shape=[out_channels],dtype=tf.float32), trainable=trainable)
 			z = tf.nn.conv2d(x,w,strides=[1,1,1,1],padding='SAME') + b 
@@ -43,6 +42,7 @@ def ConvLayer(x,name,ksize=3,layer_type='VGG16',out_channels=None, trainable=Tru
 			# zmax = tf.reduce_max(z, axis=-1, keep_dims=True)
 			# zmin = tf.reduce_min(z, axis=-1, keep_dims=True)
 			# z = ((z-zmin)/(zmax-zmin))+1
+			# z = tf.tanh(z)
 
 			activation = tf.nn.relu(z)
 			return activation,w

@@ -1,7 +1,5 @@
 import tensorflow as tf 
 import numpy as np 
-from math import ceil
-
 from layers import *
 
 
@@ -18,14 +16,19 @@ class ASCIINet:
 
 
 	def build_network(self,input, templates, batch_size):
-		self.input = input
-		self.gray_im = tf.reduce_mean(self.input,axis=-1, keep_dims=True)
+		
+		with tf.name_scope('input'):
+			self.input = input
 
-		r,g,b = tf.split(self.input, 3, axis=3)
-		self.vgg_input = tf.concat([
-			b - VGG_MEAN[0],
-			g - VGG_MEAN[1],
-			r - VGG_MEAN[2]], axis=3) 
+		with tf.name_scope('grayscale_input'):
+			self.gray_im = tf.reduce_mean(self.input,axis=-1, keep_dims=True)
+
+		with tf.name_scope('mean_subtract'):
+			r,g,b = tf.split(self.input, 3, axis=3)
+			self.vgg_input = tf.concat([
+				b - VGG_MEAN[0],
+				g - VGG_MEAN[1],
+				r - VGG_MEAN[2]], axis=3) 
 
 		#Encoder (VGG16 by default)
 		self.conv1_1,_ = ConvLayer(self.vgg_input, name='conv1_1', trainable=False)
@@ -91,46 +94,50 @@ class ASCIINet:
 		self.conv10_2, _ = ConvLayer(self.conv10_1, name='conv10_2', layer_type='Decoder', out_channels=64)
 		self.add10 = tf.add(self.conv10_2, self.conv1_2, name='add10')
 		self.batch10 = batch_norm_layer(self.add10)
+		
+		self.conv11, self.w = ConvLayer(self.batch10, name='softmax', layer_type='Softmax', out_channels=NUM_TEMPLATES, patch_size=PATCH_SIZE)
 
-		with tf.variable_scope('abc',reuse=tf.AUTO_REUSE):
-			self.w2 = tf.get_variable('w',initializer=tf.constant(5.0,dtype=tf.float32))
+		# with tf.variable_scope('abc',reuse=tf.AUTO_REUSE):
+		# 	self.w2 = tf.get_variable('w',initializer=tf.constant(5.0,dtype=tf.float32))
 
-
-		# self.batch10 = batch_norm_layer(self.add10)
-
-		self.temp = tf.placeholder(tf.float32,shape=[])
-
-		self.conv11, self.w = ConvLayer(self.add10, name='softmax', layer_type='Softmax', out_channels=NUM_TEMPLATES, patch_size=PATCH_SIZE)
-
-		self.conv11 = self.conv11 * self.temp
-
-		self.softmax = tf.exp(self.conv11) / tf.reduce_sum(tf.exp(self.conv11), axis=-1, keep_dims=True)
-
+		# self.temp = tf.placeholder(tf.float32,shape=[])
 		self.template_tensor = TemplateLayer(templates,rgb=False)
+		# self.template_tensor = tf.constant(templates,dtype=tf.float32)
+		self.softmax = (tf.nn.softmax(self.conv11)) #* self.temp
 
-		reshaped_templates = tf.transpose(tf.reshape(self.template_tensor,[-1, PATCH_SIZE ** 2, NUM_TEMPLATES]),perm=[0,2,1])
-		reshaped_softmax = tf.reshape(self.softmax,[-1, (IM_SHAPE//PATCH_SIZE) ** 2, 16])
+		with tf.name_scope('reshaped_templates'):
+			reshaped_templates = tf.transpose(tf.reshape(self.template_tensor,[-1, PATCH_SIZE ** 2, NUM_TEMPLATES]),perm=[0,2,1])
 
-		self.output = tf.matmul(reshaped_softmax,reshaped_templates)
+		with tf.name_scope('reshaped_softmax'):
+			reshaped_softmax = tf.reshape(self.softmax,[-1, (IM_SHAPE//PATCH_SIZE) ** 2, 16])
 
-		self.reshaped_output = tf.reshape(tf.transpose(tf.reshape(
-			self.output, [batch_size,28,28,8,8]),
-			perm=[0,1,3,2,4]), [batch_size,224,224,1])
+		with tf.name_scope('output'):
+			self.output = tf.matmul(reshaped_softmax,reshaped_templates)
+
+		with tf.name_scope('reshaped_output'):
+			self.reshaped_output = tf.reshape(tf.transpose(tf.reshape(
+				self.output, [batch_size,28,28,8,8]),
+				perm=[0,1,3,2,4]), [batch_size,224,224,1])
+
+		print(self.gray_im.get_shape())
+		print(self.reshaped_output.get_shape())
 
 		##################Regularizers#####################################
-		self.entropy = EntropyRegularizer(self.softmax)
-		self.variance = VarianceRegularizer(self.softmax)
+		# self.entropy = EntropyRegularizer(self.softmax) * 5e4
+		# self.variance = VarianceRegularizer(self.softmax) * 3e4
+		# self.loss = LossLayer(self.gray_im,self.reshaped_output) + self.entropy + self.variance
+		# self.loss = LossLayer(self.gray_im,self.reshaped_output)
 		###########################################################
 
-		self.build_summaries()
+		# self.build_summaries()
 
 
-		# self.print_architecture()
 
 
 	def build_summaries(self):
 		tf.summary.image('target', self.gray_im, max_outputs=1)
 		tf.summary.image('output', self.reshaped_output, max_outputs=1)
+
 		for i in range(16):
 			tf.summary.image('templates', self.template_tensor[..., i:i+1])
 		with tf.variable_scope('conv1_1', reuse=True):
@@ -189,30 +196,15 @@ class ASCIINet:
 				tf.summary.scalar('final_encoder_weight',el_mean)
 
 
-		tf.summary.scalar('entropy',self.entropy)
-		tf.summary.scalar('variance',self.variance)
-		tf.summary.scalar('temperature',self.temp)
-
-
-
+		# tf.summary.scalar('entropy',self.entropy)
+		# tf.summary.scalar('variance',self.variance)
+		# tf.summary.scalar('temperature',self.temp)
+		# tf.summary.scalar('loss',self.loss)
 
 		self.summaries = tf.summary.merge_all()
 
 
-	def DenseLayer(self,x,name):
-		with tf.variable_scope(name):
-			shape = x.get_shape().as_list()
-			dim = 1
-			for d in shape[1:]:
-				dim *= d
-			x = tf.reshape(x,[-1,dim])
 
-			weights = self.get_dense_weight(name)
-			biases = self.get_vgg_biases(name)
-
-			return tf.matmul(x, weights) + biases
-	def get_dense_weight(self, name):
-		return tf.constant(self.vgg_weights[name][0], name='weights')
 
 	def print_architecture(self):
 		print(self.conv1_1.get_shape())

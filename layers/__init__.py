@@ -8,3 +8,7 @@ from TemplateLayer import *
 ##Regularizers
 from EntropyRegularizer import *
 from VarianceRegularizer import *
+
+
+#Loss
+from LossLayer import *

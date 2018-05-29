@@ -2,16 +2,15 @@ import sys
 sys.path.append('layers/')
 sys.path.append('utils/')
 import os
+import time
+import argparse
 import tensorflow as tf
 import numpy as np 
-import sklearn
 import imdata
-import argparse
-# from constants import Constants 
 
 from tfmodel import *
 from tfoptimizer import * 
-from Loss import *
+from layers import LossLayer
 
 from utils import *
 
@@ -35,12 +34,23 @@ experiments_dir = const.experiments_dir
 argParser = argparse.ArgumentParser(description='training')
 argParser.add_argument('-g','--gpu',dest="gpu",action="store",default=1,type=int)
 argParser.add_argument('-i','--iterations',dest='iterations',action='store',default=0,type=int)
+argParser.add_argument('-u','--update',dest='update',action='store',default=100,type=int)
+argParser.add_argument('-lr','--learning-rate', dest='lr',action='store',default=1e-3,type=float)
+argParser.add_argument('-db','--debug',dest='debug',action='store',default=False,type=bool)
 cmdArgs = argParser.parse_args()
 ##################################################
 
+
+####Settings######################################
+gpu = cmdArgs.gpu
+iterations = cmdArgs.iterations
+update = cmdArgs.update
+base_lr = cmdArgs.lr
+debug = cmdArgs.debug
+
 ########GPU Settings###########################
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = str(cmdArgs.gpu)
+os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 config.allow_soft_placement = True
@@ -90,6 +100,10 @@ def print_network():
 	print("w:", sess.run(m.w[:,:,:,0]))
 	print("Wshape:",sess.run(m.w).shape)
 	print("w2:", sess.run(m.w2))
+	print("w2shape",sess.run(m.w2).shape)
+
+	# print("Input Range:",sess.run(m.gray_im[0,1:6,1:6,:]))
+	# print("Output Range:", sess.run(m.reshaped_output[0,1:6,1:6,:]))
 
 
 
@@ -103,7 +117,7 @@ next_batch = it.get_next()
 
 
 ##########Logger########################
-writer = tf.summary.FileWriter('./logs/')
+# writer = tf.summary.FileWriter('./logs/',sess.graph)
 ########################################
 
 
@@ -117,54 +131,74 @@ y = imdata.get_templates()
 
 ############Hyper-Parameneters###############
 t = 1.0
-base_lr = 1e-6
 #############################################
 
 
 
 ##############Build Graph###################
-with tf.device('/gpu:'+str(cmdArgs.gpu)):
+with tf.device('/gpu:'+str(0)):
 	m = ASCIINet(images=x,templates=y)
-	print(m)
-	l = Loss(m.gray_im, m.reshaped_output)
-	# opt,lr = optimize(l.loss + (5e2 * m.entropy) + (3e1 * m.variance))
+	l = LossLayer(m.gray_im, m.reshaped_output)
 	opt, lr = optimize(l.loss)
-############################################
-tf.summary.scalar('loss',l.loss)
 merged = tf.summary.merge_all()
+############################################
+
 
 ############Training################################
 
 with sess:
 	sess.run(tf.global_variables_initializer())
-	# print([sess.run(v) for v in tf.global_variables()])
-	for i in range(cmdArgs.iterations):
+	writer = tf.summary.FileWriter('./logs/',sess.graph)
+
+	for i in range(iterations):
+		startTime = time.time()
+
 		if i == 0:
 			lrate = base_lr
 			print_network()
 
-		summary = sess.run([opt,l.loss],feed_dict={lr: lrate, m.temp:t})
-		if i % 100 == 0:
-			lrate = lr_schedule(base_lr,i)
+		# summary = sess.run([opt,l.loss],feed_dict={lr: lrate, m.temp:t})
+		lrate = lr_schedule(base_lr,i)
+		feed_dict = {lr: lrate}
+		# summary = sess.run([opt,l.loss],feed_dict={lr: lrate})
+		summary, result, totalLoss = sess.run([merged, opt, l.loss], feed_dict=feed_dict)
+
+		# print("Learning Rate:",sess.run(lr, feed_dict=feed))
+
+
+		if i % update == 0:
+			now = time.time() - startTime
+			itPerSec = update/now
+
+			# lrate = lr_schedule(base_lr,i)
 			print('Iteration #:',str(i))
+			print('Iterations per second:',str(itPerSec))
 			print('Learning Rate:',str(lrate))
-			print('Loss:',str(summary[1]))
-			print('')
-			summary = sess.run(m.summaries, feed_dict={lr: lrate, m.temp:t})
-			writer.add_summary(summary,global_step=i+1)
-			# tf.summary.scalar('loss',summary[1])
+			print('Loss:',str(totalLoss))
 
 
+			# if debug:
+			# 	print("Input Range:",sess.run(l.e_3[0,3:7,3:7,:]))
+			# 	print("Output Range:", sess.run(l.p_3[0,3:7,3:7,:]))
+			# print('')
+			# summary = sess.run(m.summaries, feed_dict={lr: lrate, m.temp:t})
+			# summary, summary2 = sess.run([m.summaries, l.summaries], feed_dict={lr: lrate})
+			writer.add_summary(summary,i+1)
+			# writer.flush()
+			# print_network()
+			# writer.add_summary(summary,global_step=i+1)
+			# writer.add_summary(summary2, global_step=i+1)
+			# tf.summary.scalar('loss',summ
 
-			values = sess.run(m.softmax[0, 16, :, :], feed_dict={m.temp:t})
-			tf.summary.scalar('loss',l.loss)
+			# values = sess.run(m.softmax[0, 16, :, :], feed_dict={m.temp:t})
+			values = sess.run(m.softmax[0, 16, :, :])
+			# tf.summary.scalar('loss',l)
 			for j in range(28):
-				# print(j)
 				log_histogram(writer, 'coeff' + str(j), values[j,:],i)
 		# print(summary[1])
 
-		if (i+1) % 50 == 0 and t<=15:
-			t += 0.05
+		# if (i+1) % 50 == 0 and t<=15:
+		# 	t += 0.05
 
 			# with tf.variable_scope('conv1_1', reuse=True):
 			# 	conv1_1_weights = tf.get_variable('filter')

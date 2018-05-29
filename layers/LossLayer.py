@@ -6,30 +6,40 @@ class LossLayer:
 		self.loss = self.MSE(y,y_pred)
 		tf.summary.scalar('loss',self.loss)
 		self.summaries = tf.summary.merge_all()
-		#Entropy loss
-
-		#Perceptual loss
 
 	def entropy_loss(self,y_pred):
 		return tf.reduce_mean(-1.0 * tf.reduce_sum(y_pred * tf.log(y_pred + 1e-8), axis=3))
 
-	# def MSE(self,y,y_pred):
-	# 	return tf.losses.mean_squared_error(y,y_pred)
+	def MSE2(self,y,y_pred):
+		return tf.losses.mean_squared_error(y,y_pred)
 
 	def MSE(self,y, y_pred):
-	    # 1x128x128x1
-	    e_1 = self.downsample(expected)
-	    p_1 = self.downsample(predicted)
-	    # 1x64x64x1
-	    e_2 = self.downsample(e_1)
-	    p_2 = self.downsample(p_1)
-	    # 1x32x32x1
-	    e_3 = self.downsample(e_2)
-	    p_3 = self.downsample(p_2)
-	    return \
-	        tf.reduce_mean(tf.square(e_1 - p_1)) + \
-	        tf.reduce_mean(tf.square(e_2 - p_2)) + \
-	        tf.reduce_mean(tf.square(e_3 - p_3))
+		# 1x128x128x1
+		with tf.name_scope('downsample1'):
+			self.e_1 = self.downsample(y)
+			self.p_1 = self.downsample(y_pred)
+		# 1x64x64x1
+		with tf.name_scope('downsample2'):
+			self.e_2 = self.downsample(self.e_1)
+			self.p_2 = self.downsample(self.p_1)
+		# 1x32x32x1
+		with tf.name_scope('downsample3'):
+			self.e_3 = self.downsample(self.e_2)
+			self.p_3 = self.downsample(self.p_2)
+
+		tf.summary.image('im_down1',self.e_1)
+		tf.summary.image('p_down1',self.p_1)
+		tf.summary.image('im_down2',self.e_2)
+		tf.summary.image('p_down2',self.p_2)
+		tf.summary.image('im_down3',self.e_3)
+		tf.summary.image('p_down3',self.p_3)
+
+		with tf.name_scope('ms_mse'):
+			totalLoss = (tf.reduce_mean(tf.square(self.e_1 - self.p_1)) + \
+						tf.reduce_mean(tf.square(self.e_2 - self.p_2)) + \
+						tf.reduce_mean(tf.square(self.e_3 - self.p_3)))
+		return totalLoss
+
 
 	def variance_loss(self,y_pred):
 		bins = tf.reshape(np.linspace(1,16,num=16).astype('float32'),[1,1,1,16])
