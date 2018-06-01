@@ -5,7 +5,7 @@ from batch_norm_layer import *
 vgg_weights = np.load('./weights/vgg16.npy',encoding='latin1').item()
 
 
-def ConvLayer(x,name,ksize=3,layer_type='VGG16',out_channels=None, trainable=True, patch_size=None):
+def ConvLayer(x,name,ksize=3,layer_type='VGG16',out_channels=None, trainable=True, patch_size=None, batch_norm=False):
 
 	in_channels = x.get_shape()[3].value
 
@@ -24,6 +24,9 @@ def ConvLayer(x,name,ksize=3,layer_type='VGG16',out_channels=None, trainable=Tru
 			b = tf.get_variable('bias', initializer=tf.constant(0.0, shape=[out_channels], dtype=tf.float32), trainable=trainable)
 			z = tf.nn.conv2d(x, w, strides=[1,patch_size,patch_size,1], padding='SAME') + b
 
+			if batch_norm:
+				z = batch_norm_layer(z)
+
 			# zmax = tf.reduce_max(z, axis=-1, keep_dims=True)
 			# zmin = tf.reduce_min(z, axis=-1, keep_dims=True)
 			# z = ((z-zmin)/(zmax-zmin))+1
@@ -39,10 +42,13 @@ def ConvLayer(x,name,ksize=3,layer_type='VGG16',out_channels=None, trainable=Tru
 			b = tf.get_variable('bias',  initializer=tf.constant(0.0,shape=[out_channels],dtype=tf.float32), trainable=trainable)
 			z = tf.nn.conv2d(x,w,strides=[1,1,1,1],padding='SAME') + b 
 
+			if batch_norm:
+				z = batch_norm_layer(z)
+
 			# zmax = tf.reduce_max(z, axis=-1, keep_dims=True)
 			# zmin = tf.reduce_min(z, axis=-1, keep_dims=True)
 			# z = ((z-zmin)/(zmax-zmin))+1
-			# z = tf.tanh(z)
+			z = tf.tanh(z)
 
 			activation = tf.nn.relu(z)
 			return activation,w

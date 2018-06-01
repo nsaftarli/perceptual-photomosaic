@@ -2,8 +2,11 @@ import tensorflow as tf
 import numpy as np 
 
 class LossLayer:
-	def __init__(self,y,y_pred):
-		self.loss = self.MSE(y,y_pred)
+	def __init__(self,y,y_pred, img=False):
+		if img:
+			self.loss = (0*self.MSE(y,y_pred)) + self.entropy_loss(y_pred) + self.variance_loss(y_pred)
+		else:
+			self.loss = self.MSE2(y,y_pred)
 		tf.summary.scalar('loss',self.loss)
 		self.summaries = tf.summary.merge_all()
 
@@ -11,6 +14,8 @@ class LossLayer:
 		return tf.reduce_mean(-1.0 * tf.reduce_sum(y_pred * tf.log(y_pred + 1e-8), axis=3))
 
 	def MSE2(self,y,y_pred):
+		# tf.summary.image('output',y)
+		# tf.summary.image('predicted',y_pred)
 		return tf.losses.mean_squared_error(y,y_pred)
 
 	def MSE(self,y, y_pred):
@@ -27,6 +32,8 @@ class LossLayer:
 			self.e_3 = self.downsample(self.e_2)
 			self.p_3 = self.downsample(self.p_2)
 
+		tf.summary.image('output',y)
+		tf.summary.image('predicted',y_pred)
 		tf.summary.image('im_down1',self.e_1)
 		tf.summary.image('p_down1',self.p_1)
 		tf.summary.image('im_down2',self.e_2)

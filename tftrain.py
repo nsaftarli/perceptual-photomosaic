@@ -8,6 +8,7 @@ import tensorflow as tf
 import numpy as np 
 import imdata
 
+
 from tfmodel import *
 from tfoptimizer import * 
 from layers import LossLayer
@@ -124,9 +125,19 @@ next_batch = it.get_next()
 
 
 x = sess.run(next_batch)
+print(x.shape)
 x = tf.convert_to_tensor(x,tf.float32)
+
 y = imdata.get_templates()
 
+
+
+############Pebbles Test#####################
+
+
+
+# x = imdata.get_pebbles()
+# x = tf.convert_to_tensor(x,tf.float32)
 
 
 ############Hyper-Parameneters###############
@@ -138,8 +149,13 @@ t = 1.0
 ##############Build Graph###################
 with tf.device('/gpu:'+str(0)):
 	m = ASCIINet(images=x,templates=y)
-	l = LossLayer(m.gray_im, m.reshaped_output)
-	opt, lr = optimize(l.loss)
+	l = LossLayer(m.gray_im, m.reshaped_output, img=True)
+	l1 = LossLayer(m.feature_dict['conv1_2_1'], m.feature_dict['conv1_2_2'])
+	l2 = LossLayer(m.feature_dict['conv2_2_1'], m.feature_dict['conv2_2_2'])
+	l3 = LossLayer(m.feature_dict['conv3_3_1'], m.feature_dict['conv3_3_2'])
+	l4 = LossLayer(m.feature_dict['conv4_3_1'], m.feature_dict['conv4_3_2'])
+	l5 = LossLayer(m.feature_dict['conv5_3_1'], m.feature_dict['conv5_3_2'])
+	opt, lr = optimize(5 * l.loss + (1e2*l1.loss) + (1e0*l2.loss) + (1e0*l3.loss) + (1e0*l4.loss) + (1e0*l5.loss))
 merged = tf.summary.merge_all()
 ############################################
 
@@ -151,11 +167,14 @@ with sess:
 	writer = tf.summary.FileWriter('./logs/',sess.graph)
 
 	for i in range(iterations):
+		x = sess.run(next_batch)
+		x = tf.convert_to_tensor(x,tf.float32)
 		startTime = time.time()
 
 		if i == 0:
 			lrate = base_lr
 			print_network()
+
 
 		# summary = sess.run([opt,l.loss],feed_dict={lr: lrate, m.temp:t})
 		lrate = lr_schedule(base_lr,i)
@@ -177,9 +196,9 @@ with sess:
 			print('Loss:',str(totalLoss))
 
 
-			# if debug:
-			# 	print("Input Range:",sess.run(l.e_3[0,3:7,3:7,:]))
-			# 	print("Output Range:", sess.run(l.p_3[0,3:7,3:7,:]))
+			if debug:
+				print("Input Range:",sess.run(m.gray_im[0,3:7,3:7,:]))
+				print("Output Range:", sess.run(m.reshaped_output[0,3:7,3:7,:]))
 			# print('')
 			# summary = sess.run(m.summaries, feed_dict={lr: lrate, m.temp:t})
 			# summary, summary2 = sess.run([m.summaries, l.summaries], feed_dict={lr: lrate})
