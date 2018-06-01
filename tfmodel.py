@@ -1,6 +1,7 @@
 import tensorflow as tf 
 import numpy as np 
 from layers import *
+from VGG16 import *
 
 
 VGG_MEAN = [103.939, 116.779, 123.68]
@@ -12,7 +13,8 @@ class ASCIINet:
 
 	def __init__(self, images, templates, weight_path='./weights/vgg16.npy',batch_size=1):
 		self.vgg_weights = np.load(weight_path, encoding='latin1').item()
-		self.vgg = self.build_network(images,templates,batch_size=batch_size)
+		self.vgg = VGG16(input=images)
+		self.net = self.build_network(images,templates,batch_size=batch_size)
 
 
 	def build_network(self,input, templates, batch_size):
@@ -21,85 +23,80 @@ class ASCIINet:
 			self.input = input
 
 		with tf.name_scope('grayscale_input'):
-			self.gray_im = tf.reduce_mean(self.input,axis=-1, keep_dims=True)
+			self.gray_im = tf.reduce_min(self.input,axis=-1, keep_dims=True)
 
-		with tf.name_scope('mean_subtract'):
-			r,g,b = tf.split(self.input, 3, axis=3)
-			self.vgg_input = tf.concat([
-				b - VGG_MEAN[0],
-				g - VGG_MEAN[1],
-				r - VGG_MEAN[2]], axis=3) 
+		# with tf.name_scope('mean_subtract'):
+		# 	r,g,b = tf.split(self.input, 3, axis=3)
+		# 	self.vgg_input = tf.concat([
+		# 		b - VGG_MEAN[0],
+		# 		g - VGG_MEAN[1],
+		# 		r - VGG_MEAN[2]], axis=3) 
 
-		#Encoder (VGG16 by default)
-		self.conv1_1,_ = ConvLayer(self.vgg_input, name='conv1_1', trainable=False)
-		self.conv1_2,_ = ConvLayer(self.conv1_1, name='conv1_2', trainable=False)
-		self.pool1 = PoolLayer(self.conv1_2, name='pool1', trainable=False)
+		# vgg = VGG16(input=input)
 
-		self.conv2_1,_ = ConvLayer(self.pool1, name='conv2_1', trainable=False)
-		self.conv2_2,_ = ConvLayer(self.conv2_1, name='conv2_2', trainable=False)
-		self.pool2 = PoolLayer(self.conv2_2, name='pool2', trainable=False)
+		#################Encoder (VGG16 by default)###############################################################
+		# #################Block 1################
+		# self.conv1_1,_ = ConvLayer(self.vgg_input, name='conv1_1', trainable=False)
+		# self.conv1_2,_ = ConvLayer(self.conv1_1, name='conv1_2', trainable=False)
+		# self.pool1 = PoolLayer(self.conv1_2, name='pool1', trainable=False)
+		# #################Block 2################
+		# self.conv2_1,_ = ConvLayer(self.pool1, name='conv2_1', trainable=False)
+		# self.conv2_2,_ = ConvLayer(self.conv2_1, name='conv2_2', trainable=False)
+		# self.pool2 = PoolLayer(self.conv2_2, name='pool2', trainable=False)
+		# #################Block 3################
+		# self.conv3_1,_ = ConvLayer(self.pool2, name='conv3_1', trainable=False)
+		# self.conv3_2,_ = ConvLayer(self.conv3_1, name='conv3_2', trainable=False)
+		# self.conv3_3,_ = ConvLayer(self.conv3_2, name='conv3_3', trainable=False)
+		# self.pool3 = PoolLayer(self.conv3_3, name='pool3', trainable=False)
+		# #################Block 4################
+		# self.conv4_1,_ = ConvLayer(self.pool3, name='conv4_1', trainable=False)
+		# self.conv4_2,_ = ConvLayer(self.conv4_1, name='conv4_2', trainable=False)
+		# self.conv4_3,_ = ConvLayer(self.conv4_2, name='conv4_3', trainable=False)
+		# self.pool4 = PoolLayer(self.conv4_3, name='pool4', trainable=False)
+		# #################Block 5################
+		# self.conv5_1,_ = ConvLayer(self.pool4, name='conv5_1', trainable=False)
+		# self.conv5_2,_ = ConvLayer(self.conv5_1, name='conv5_2', trainable=False)
+		# self.conv5_3,self.w2 = ConvLayer(self.conv5_2, name='conv5_3', trainable=False)
+		# self.pool5 = PoolLayer(self.conv5_3, name='pool5', trainable=False)
 
+		#################Decoder################################################################################
+		#################Block 6################
+		self.up6 = UpSampleLayer(self.vgg.pool5,scale_factor=2,name='up6')
+		self.conv6_1,_ = ConvLayer(self.up6, name='conv6_1', layer_type='Decoder', out_channels=512, batch_norm=True)
+		self.conv6_2,_ = ConvLayer(self.conv6_1, name='conv6_2', layer_type='Decoder', out_channels=512, batch_norm=True)
+		self.conv6_3,_ = ConvLayer(self.conv6_2, name='conv6_3', layer_type='Decoder', out_channels=512, batch_norm=True)
+		self.add6 = tf.add(self.conv6_3,self.vgg.conv5_3, name='add6')
+		# self.batch6 = batch_norm_layer(self.add6)
+		#################Block 7################
+		self.up7 = UpSampleLayer(self.add6,scale_factor=2,name='up7')
+		self.conv7_1,_ = ConvLayer(self.up7, name='conv7_1', layer_type='Decoder', out_channels=512, batch_norm=True)
+		self.conv7_2,_ = ConvLayer(self.conv7_1, name='conv7_2', layer_type='Decoder', out_channels=512, batch_norm=True)
+		self.conv7_3,_ = ConvLayer(self.conv7_2, name='conv7_3', layer_type='Decoder', out_channels=512, batch_norm=True)
+		self.add7 = tf.add(self.conv7_3, self.vgg.conv4_3, name='add7')
+		# self.batch7 = batch_norm_layer(self.add7)
+		#################Block 8################
+		self.up8 = UpSampleLayer(self.add7,scale_factor=2,name='up8')
+		self.conv8_1,_ = ConvLayer(self.up8, name='conv8_1', layer_type='Decoder', out_channels=256, batch_norm=True)
+		self.conv8_2,_ = ConvLayer(self.conv8_1, name='conv8_2', layer_type='Decoder', out_channels=256, batch_norm=True)
+		self.conv8_3,_ = ConvLayer(self.conv8_2, name='conv8_3', layer_type='Decoder', out_channels=256, batch_norm=True)
+		self.add8 = tf.add(self.conv8_3, self.vgg.conv3_3, name='add8')
+		# self.batch8 = batch_norm_layer(self.add8)
+		#################Block 9################
+		self.up9 = UpSampleLayer(self.add8,scale_factor=2,name='up9')
+		self.conv9_1,_ = ConvLayer(self.up9, name='conv9_1', layer_type='Decoder', out_channels=128, batch_norm=True)
+		self.conv9_2,_ = ConvLayer(self.conv9_1, name='conv9_2', layer_type='Decoder', out_channels=128, batch_norm=True)
+		self.add9 = tf.add(self.conv9_2, self.vgg.conv2_2, name='add9')
+		# self.batch9 = batch_norm_layer(self.add9)
+		#################Block 10################
+		self.up10 = UpSampleLayer(self.add9,scale_factor=2,name='up10')
+		self.conv10_1,_ = ConvLayer(self.up10, name='conv10_1', layer_type='Decoder', out_channels=64, batch_norm=True)
+		self.conv10_2, _ = ConvLayer(self.conv10_1, name='conv10_2', layer_type='Decoder', out_channels=64, batch_norm=True)
+		self.add10 = tf.add(self.conv10_2, self.vgg.conv1_2, name='add10')
+		# self.batch10 = batch_norm_layer(self.add10)
 
-		self.conv3_1,_ = ConvLayer(self.pool2, name='conv3_1', trainable=False)
-		self.conv3_2,_ = ConvLayer(self.conv3_1, name='conv3_2', trainable=False)
-		self.conv3_3,_ = ConvLayer(self.conv3_2, name='conv3_3', trainable=False)
-		self.pool3 = PoolLayer(self.conv3_3, name='pool3', trainable=False)
-
-
-		self.conv4_1,_ = ConvLayer(self.pool3, name='conv4_1', trainable=False)
-		self.conv4_2,_ = ConvLayer(self.conv4_1, name='conv4_2', trainable=False)
-		self.conv4_3,_ = ConvLayer(self.conv4_2, name='conv4_3', trainable=False)
-		self.pool4 = PoolLayer(self.conv4_3, name='pool4', trainable=False)
-
-
-		self.conv5_1,_ = ConvLayer(self.pool4, name='conv5_1', trainable=False)
-		self.conv5_2,_ = ConvLayer(self.conv5_1, name='conv5_2', trainable=False)
-		self.conv5_3,self.w2 = ConvLayer(self.conv5_2, name='conv5_3', trainable=False)
-		self.pool5 = PoolLayer(self.conv5_3, name='pool5', trainable=False)
-
-		#Decoder
-		self.up6 = UpSampleLayer(self.pool5,scale_factor=2,name='up6')
-		self.conv6_1,_ = ConvLayer(self.up6, name='conv6_1', layer_type='Decoder', out_channels=512)
-		self.conv6_2,_ = ConvLayer(self.conv6_1, name='conv6_2', layer_type='Decoder', out_channels=512)
-		self.conv6_3,_ = ConvLayer(self.conv6_2, name='conv6_3', layer_type='Decoder', out_channels=512)
-		self.add6 = tf.add(self.conv6_3,self.conv5_3, name='add6')
-		self.batch6 = batch_norm_layer(self.add6)
-
-
-		self.up7 = UpSampleLayer(self.batch6,scale_factor=2,name='up7')
-		self.conv7_1,_ = ConvLayer(self.up7, name='conv7_1', layer_type='Decoder', out_channels=512)
-		self.conv7_2,_ = ConvLayer(self.conv7_1, name='conv7_2', layer_type='Decoder', out_channels=512)
-		self.conv7_3,_ = ConvLayer(self.conv7_2, name='conv7_3', layer_type='Decoder', out_channels=512)
-		self.add7 = tf.add(self.conv7_3, self.conv4_3, name='add7')
-		self.batch7 = batch_norm_layer(self.add7)
-
-
-		self.up8 = UpSampleLayer(self.batch7,scale_factor=2,name='up8')
-		self.conv8_1,_ = ConvLayer(self.up8, name='conv8_1', layer_type='Decoder', out_channels=256)
-		self.conv8_2,_ = ConvLayer(self.conv8_1, name='conv8_2', layer_type='Decoder', out_channels=256)
-		self.conv8_3,_ = ConvLayer(self.conv8_2, name='conv8_3', layer_type='Decoder', out_channels=256)
-		self.add8 = tf.add(self.conv8_3, self.conv3_3, name='add8')
-		self.batch8 = batch_norm_layer(self.add8)
-
-
-		self.up9 = UpSampleLayer(self.batch8,scale_factor=2,name='up9')
-		self.conv9_1,_ = ConvLayer(self.up9, name='conv9_1', layer_type='Decoder', out_channels=128)
-		self.conv9_2,_ = ConvLayer(self.conv9_1, name='conv9_2', layer_type='Decoder', out_channels=128)
-		self.add9 = tf.add(self.conv9_2, self.conv2_2, name='add9')
-		self.batch9 = batch_norm_layer(self.add9)
-
-
-		self.up10 = UpSampleLayer(self.batch9,scale_factor=2,name='up10')
-		self.conv10_1,_ = ConvLayer(self.up10, name='conv10_1', layer_type='Decoder', out_channels=64)
-		self.conv10_2, _ = ConvLayer(self.conv10_1, name='conv10_2', layer_type='Decoder', out_channels=64)
-		self.add10 = tf.add(self.conv10_2, self.conv1_2, name='add10')
-		self.batch10 = batch_norm_layer(self.add10)
-		
-		self.conv11, self.w = ConvLayer(self.batch10, name='softmax', layer_type='Softmax', out_channels=NUM_TEMPLATES, patch_size=PATCH_SIZE)
-
-		# with tf.variable_scope('abc',reuse=tf.AUTO_REUSE):
-		# 	self.w2 = tf.get_variable('w',initializer=tf.constant(5.0,dtype=tf.float32))
-
+		#################Output################################################################################
+		self.conv11, self.w = ConvLayer(self.add10, name='softmax', layer_type='Softmax', 
+										out_channels=NUM_TEMPLATES, patch_size=PATCH_SIZE, batch_norm=True)
 		# self.temp = tf.placeholder(tf.float32,shape=[])
 		self.template_tensor = TemplateLayer(templates,rgb=False)
 		# self.template_tensor = tf.constant(templates,dtype=tf.float32)
@@ -119,17 +116,33 @@ class ASCIINet:
 				self.output, [batch_size,28,28,8,8]),
 				perm=[0,1,3,2,4]), [batch_size,224,224,1])
 
-		print(self.gray_im.get_shape())
-		print(self.reshaped_output.get_shape())
+		with tf.name_scope('tiled_output'):
+			self.tiled_output = tf.tile(self.reshaped_output,[1,1,1,3])
+
+		with tf.name_scope('second_vgg'):
+			self.vgg2 = VGG16(input=self.tiled_output)
+
+
+
+		self.feature_dict = {
+								'conv1_2_1':self.vgg.conv1_2, 'conv1_2_2':self.vgg2.conv1_2,
+								'conv2_2_1':self.vgg.conv2_2, 'conv2_2_2':self.vgg2.conv2_2,
+								'conv3_3_1':self.vgg.conv3_3, 'conv3_3_2':self.vgg2.conv3_3,
+								'conv4_3_1':self.vgg.conv4_3, 'conv4_3_2':self.vgg2.conv4_3,
+								'conv5_3_1':self.vgg.conv5_3, 'conv5_3_2':self.vgg2.conv5_3
+
+							}
+
 
 		##################Regularizers#####################################
 		# self.entropy = EntropyRegularizer(self.softmax) * 5e4
 		# self.variance = VarianceRegularizer(self.softmax) * 3e4
 		# self.loss = LossLayer(self.gray_im,self.reshaped_output) + self.entropy + self.variance
 		# self.loss = LossLayer(self.gray_im,self.reshaped_output)
+
 		###########################################################
 
-		# self.build_summaries()
+		self.build_summaries()
 
 
 
@@ -138,62 +151,62 @@ class ASCIINet:
 		tf.summary.image('target', self.gray_im, max_outputs=1)
 		tf.summary.image('output', self.reshaped_output, max_outputs=1)
 
-		for i in range(16):
-			tf.summary.image('templates', self.template_tensor[..., i:i+1])
-		with tf.variable_scope('conv1_1', reuse=True):
-			conv1_1_weights = tf.get_variable('filter')
-			tf.summary.scalar('conv1_1', tf.reduce_mean(conv1_1_weights))
-		with tf.variable_scope('conv6_1', reuse=True):
-			conv6_1_weights = tf.get_variable('weight')
-			tf.summary.scalar('conv6_1', tf.reduce_mean(conv6_1_weights))
+		# for i in range(16):
+		# 	tf.summary.image('templates', self.template_tensor[..., i:i+1])
+		# with tf.variable_scope('conv1_1', reuse=True):
+		# 	conv1_1_weights = tf.get_variable('filter')
+		# 	tf.summary.scalar('conv1_1', tf.reduce_mean(conv1_1_weights))
+		# with tf.variable_scope('conv6_1', reuse=True):
+		# 	conv6_1_weights = tf.get_variable('weight')
+		# 	tf.summary.scalar('conv6_1', tf.reduce_mean(conv6_1_weights))
 
-		with tf.variable_scope('softmax', reuse=True):
-			softmax_weights = tf.get_variable('weight')
-			tf.summary.histogram('weight',softmax_weights)
-		with tf.variable_scope('add10',reuse=True):
-			tf.summary.histogram('add10',self.add10)
+		# with tf.variable_scope('softmax', reuse=True):
+		# 	softmax_weights = tf.get_variable('weight')
+		# 	tf.summary.histogram('weight',softmax_weights)
+		# with tf.variable_scope('add10',reuse=True):
+		# 	tf.summary.histogram('add10',self.add10)
 
-		with tf.variable_scope('conv6_2', reuse=True):
-			conv6_2_weights = tf.get_variable('weight')
-			tf.summary.scalar('conv6_2', tf.reduce_mean(conv6_2_weights))
+		# with tf.variable_scope('conv6_2', reuse=True):
+		# 	conv6_2_weights = tf.get_variable('weight')
+		# 	tf.summary.scalar('conv6_2', tf.reduce_mean(conv6_2_weights))
 
-		with tf.variable_scope('conv6_2', reuse=True):
-			conv6_2_biases = tf.get_variable('bias')
-			tf.summary.scalar('conv6_2_b', tf.reduce_mean(conv6_2_biases))
-
-
-		for i,el in enumerate(tf.get_collection('pre-act')):
-			print(el)
-			el_mean = tf.reduce_mean(el[0,:,:,:])
+		# with tf.variable_scope('conv6_2', reuse=True):
+		# 	conv6_2_biases = tf.get_variable('bias')
+		# 	tf.summary.scalar('conv6_2_b', tf.reduce_mean(conv6_2_biases))
 
 
-			if i == 26 :
-				tf.summary.scalar('final_encoder_pre',el_mean)
+		# for i,el in enumerate(tf.get_collection('pre-act')):
+		# 	print(el)
+		# 	el_mean = tf.reduce_mean(el[0,:,:,:])
+
+
+		# 	if i == 26 :
+		# 		tf.summary.scalar('final_encoder_pre',el_mean)
 
 
 
 
-		for i,el in enumerate(tf.get_collection('activations')):
-			print(el)
-			el_mean = tf.reduce_mean(el[0,:,:,:])
+		# for i,el in enumerate(tf.get_collection('activations')):
+		# 	print(el)
+		# 	el_mean = tf.reduce_mean(el[0,:,:,:])
 
-			if i == 26 :
-				tf.summary.scalar('final_encoder_act',el_mean)
+		# 	if i == 26 :
+		# 		tf.summary.scalar('final_encoder_act',el_mean)
 
 
-		for i,el in enumerate(tf.get_collection('conv_biases')):
-			print(el)
-			el_mean = tf.reduce_mean(el)
+		# for i,el in enumerate(tf.get_collection('conv_biases')):
+		# 	print(el)
+		# 	el_mean = tf.reduce_mean(el)
 
-			if i == 26 :
-				tf.summary.scalar('final_encoder_bias',el_mean)
+		# 	if i == 26 :
+		# 		tf.summary.scalar('final_encoder_bias',el_mean)
 
-		for i,el in enumerate(tf.get_collection('conv_weights')):
-			print(el)
-			el_mean = tf.reduce_mean(el)
+		# for i,el in enumerate(tf.get_collection('conv_weights')):
+		# 	print(el)
+		# 	el_mean = tf.reduce_mean(el)
 
-			if i == 26 :
-				tf.summary.scalar('final_encoder_weight',el_mean)
+		# 	if i == 26 :
+		# 		tf.summary.scalar('final_encoder_weight',el_mean)
 
 
 		# tf.summary.scalar('entropy',self.entropy)

@@ -7,6 +7,12 @@ from PIL import Image
 from utils.constants import Constants
 import tensorflow as tf 
 
+
+###############################################
+from skimage import feature
+from scipy import ndimage as ndi 
+##############################################
+
 const = Constants()
 
 img_data_dir = const.img_data_dir
@@ -72,3 +78,28 @@ def get_templates(path='./assets/char_set/', num_chars=16):
 		images[0,:,:,j] = np.mean(im,axis=-1)
 	# return tf.convert_to_tensor(images,tf.float32)
 	return images
+
+def get_pebbles(path='./pebbles.jpg'):
+	edges = np.zeros((224,224,3), dtype='uint8')
+	img = Image.open(path).resize((224,224))
+	img_arr = np.asarray(img)
+	# r = img_arr[:,:,0]
+	# g = img_arr[:,:,1]
+	# b = img_arr[:,:,2]
+
+	# r_edges = feature.canny(r,sigma=3)
+	# g_edges = feature.canny(g,sigma=3)
+	# b_edges = feature.canny(b,sigma=3)
+
+	# edges[...,0] = r_edges * 255
+	# edges[...,1] = g_edges * 255
+	# edges[...,2] = b_edges * 255
+
+	# # edges = np.concatenate([r_edges,g_edges,b_edges],axis=-1)
+	# print(edges.dtype)
+	# print(np.asarray(img).reshape((-1,224,224,3)).dtype)
+	# print('AAAAAAAAAAAAAAa')
+	# rescaled = np.asarray(Image.fromarray(edges))
+	return img_arr.reshape((-1,224,224,3))
+	# return np.asarray(Image.fromarray(edges)).reshape((-1,224,224,3))
+	# return np.asarray(img).reshape((-1,224,224,3))
