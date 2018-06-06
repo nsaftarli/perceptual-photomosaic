@@ -103,3 +103,14 @@ def get_pebbles(path='./pebbles.jpg'):
 	return img_arr.reshape((-1,224,224,3))
 	# return np.asarray(Image.fromarray(edges)).reshape((-1,224,224,3))
 	# return np.asarray(img).reshape((-1,224,224,3))
+
+def create_char_img(path='./assets/char_set/0.png'):
+	tiles = np.zeros((224,224,3))
+	im = Image.open(path)
+	for i in range(28):
+		for j in range(28):
+			tiles[i:2*i-1,j:2*j-1,:] = im
+
+
+if __name__ == '__main__':
+	create_char_img()

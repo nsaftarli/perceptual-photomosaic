@@ -2,10 +2,8 @@ import sys
 sys.path.append('layers/')
 sys.path.append('utils/')
 import os
-
 import tensorflow as tf 
 import imdata
-
 import numpy as np
 
 VGG_MEAN = [103.939, 116.779, 123.68]
@@ -49,6 +47,8 @@ class VGG16:
 		self.conv5_2 = self.conv_layer(self.conv5_1, name='conv5_2', trainable=False)
 		self.conv5_3 = self.conv_layer(self.conv5_2, name='conv5_3', trainable=False)
 		self.pool5 = tf.nn.max_pool(self.conv5_3, ksize=[1,2,2,1], strides=[1,2,2,1], padding='SAME', name='pool5')
+
+		self.output = self.pool5
 
 
 

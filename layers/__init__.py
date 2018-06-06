@@ -1,6 +1,5 @@
 from ConvLayer import *
 from UpSampleLayer import * 
-from batch_norm_layer import *
 from PoolLayer import *
 from TemplateLayer import *
 
@@ -12,3 +11,10 @@ from VarianceRegularizer import *
 
 #Loss
 from LossLayer import *
+
+#Normalization
+# from batch_norm_layer import *
+# from InstanceNorm import *
+# from LayerNorm import *
+
+from Normalization import *

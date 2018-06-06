@@ -36,7 +36,7 @@ argParser = argparse.ArgumentParser(description='training')
 argParser.add_argument('-g','--gpu',dest="gpu",action="store",default=1,type=int)
 argParser.add_argument('-i','--iterations',dest='iterations',action='store',default=0,type=int)
 argParser.add_argument('-u','--update',dest='update',action='store',default=100,type=int)
-argParser.add_argument('-lr','--learning-rate', dest='lr',action='store',default=1e-3,type=float)
+argParser.add_argument('-lr','--learning-rate', dest='lr',action='store',default=1e-6,type=float)
 argParser.add_argument('-db','--debug',dest='debug',action='store',default=False,type=bool)
 cmdArgs = argParser.parse_args()
 ##################################################
@@ -136,8 +136,8 @@ y = imdata.get_templates()
 
 
 
-# x = imdata.get_pebbles()
-# x = tf.convert_to_tensor(x,tf.float32)
+x = imdata.get_pebbles(path='./test.jpg')
+x = tf.convert_to_tensor(x,tf.float32)
 
 
 ############Hyper-Parameneters###############
@@ -149,16 +149,19 @@ t = 1.0
 ##############Build Graph###################
 with tf.device('/gpu:'+str(0)):
 	m = ASCIINet(images=x,templates=y)
-	l = LossLayer(m.gray_im, m.reshaped_output, img=True)
-	l1 = LossLayer(m.feature_dict['conv1_2_1'], m.feature_dict['conv1_2_2'])
-	l2 = LossLayer(m.feature_dict['conv2_2_1'], m.feature_dict['conv2_2_2'])
-	l3 = LossLayer(m.feature_dict['conv3_3_1'], m.feature_dict['conv3_3_2'])
-	l4 = LossLayer(m.feature_dict['conv4_3_1'], m.feature_dict['conv4_3_2'])
-	l5 = LossLayer(m.feature_dict['conv5_3_1'], m.feature_dict['conv5_3_2'])
-	opt, lr = optimize(5 * l.loss + (1e2*l1.loss) + (1e0*l2.loss) + (1e0*l3.loss) + (1e0*l4.loss) + (1e0*l5.loss))
+	l = LossLayer(m.gray_im, m.reshaped_output).mse 
+	e = m.entropy
+	v = m.variance
+	tLoss = l+e+v
+	# l1 = LossLayer(m.feature_dict['conv1_2_1'], m.feature_dict['conv1_2_2'])
+	# l2 = LossLayer(m.feature_dict['conv2_2_1'], m.feature_dict['conv2_2_2'])
+	# l3 = LossLayer(m.feature_dict['conv3_3_1'], m.feature_dict['conv3_3_2'])
+	# l4 = LossLayer(m.feature_dict['conv4_3_1'], m.feature_dict['conv4_3_2'])
+	# l5 = LossLayer(m.feature_dict['conv5_3_1'], m.feature_dict['conv5_3_2'])
+	# opt, lr = optimize(1 * l.loss + (1e2*l1.loss) + (1e0*l2.loss) + (1e0*l3.loss) + (1e3*l4.loss) + (1e3*l5.loss))
+	opt, lr = optimize(tLoss)
 merged = tf.summary.merge_all()
 ############################################
-
 
 ############Training################################
 
@@ -167,8 +170,6 @@ with sess:
 	writer = tf.summary.FileWriter('./logs/',sess.graph)
 
 	for i in range(iterations):
-		x = sess.run(next_batch)
-		x = tf.convert_to_tensor(x,tf.float32)
 		startTime = time.time()
 
 		if i == 0:
@@ -178,9 +179,9 @@ with sess:
 
 		# summary = sess.run([opt,l.loss],feed_dict={lr: lrate, m.temp:t})
 		lrate = lr_schedule(base_lr,i)
-		feed_dict = {lr: lrate}
+		feed_dict = {lr: lrate, m.temp:t}
 		# summary = sess.run([opt,l.loss],feed_dict={lr: lrate})
-		summary, result, totalLoss = sess.run([merged, opt, l.loss], feed_dict=feed_dict)
+		summary, result, totalLoss = sess.run([merged, opt, tLoss], feed_dict=feed_dict)
 
 		# print("Learning Rate:",sess.run(lr, feed_dict=feed))
 
@@ -198,7 +199,7 @@ with sess:
 
 			if debug:
 				print("Input Range:",sess.run(m.gray_im[0,3:7,3:7,:]))
-				print("Output Range:", sess.run(m.reshaped_output[0,3:7,3:7,:]))
+				print("Output Range:", sess.run(m.reshaped_output[0,3:7,3:7,:], feed_dict={m.temp:t}))
 			# print('')
 			# summary = sess.run(m.summaries, feed_dict={lr: lrate, m.temp:t})
 			# summary, summary2 = sess.run([m.summaries, l.summaries], feed_dict={lr: lrate})
@@ -210,14 +211,14 @@ with sess:
 			# tf.summary.scalar('loss',summ
 
 			# values = sess.run(m.softmax[0, 16, :, :], feed_dict={m.temp:t})
-			values = sess.run(m.softmax[0, 16, :, :])
+			values = sess.run(m.softmax[0, 16, :, :], feed_dict={m.temp:t})
 			# tf.summary.scalar('loss',l)
 			for j in range(28):
 				log_histogram(writer, 'coeff' + str(j), values[j,:],i)
 		# print(summary[1])
 
-		# if (i+1) % 50 == 0 and t<=15:
-		# 	t += 0.05
+		if (i+1) % 50 == 0 and t<=5:
+			t += 0.05
 
 			# with tf.variable_scope('conv1_1', reuse=True):
 			# 	conv1_1_weights = tf.get_variable('filter')
