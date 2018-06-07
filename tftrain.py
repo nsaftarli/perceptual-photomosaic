@@ -133,11 +133,9 @@ y = imdata.get_templates()
 
 
 ############Pebbles Test#####################
-
-
-
-x = imdata.get_pebbles(path='./test.jpg')
+x = imdata.get_pebbles(path='./pebbles.jpg')
 x = tf.convert_to_tensor(x,tf.float32)
+#############################################
 
 
 ############Hyper-Parameneters###############
@@ -149,7 +147,9 @@ t = 1.0
 ##############Build Graph###################
 with tf.device('/gpu:'+str(0)):
 	m = ASCIINet(images=x,templates=y)
-	l = LossLayer(m.gray_im, m.reshaped_output).mse 
+	# l = LossLayer(m.gray_im, m.reshaped_output).mse 
+	l = m.loss
+
 	e = m.entropy
 	v = m.variance
 	tLoss = l+e+v
@@ -176,19 +176,13 @@ with sess:
 			lrate = base_lr
 			print_network()
 
-
-		# summary = sess.run([opt,l.loss],feed_dict={lr: lrate, m.temp:t})
 		lrate = lr_schedule(base_lr,i)
 		feed_dict = {lr: lrate, m.temp:t}
-		# summary = sess.run([opt,l.loss],feed_dict={lr: lrate})
 		summary, result, totalLoss = sess.run([merged, opt, tLoss], feed_dict=feed_dict)
-
-		# print("Learning Rate:",sess.run(lr, feed_dict=feed))
-
 
 		if i % update == 0:
 			now = time.time() - startTime
-			itPerSec = update/now
+			itPerSec = update / now
 
 			# lrate = lr_schedule(base_lr,i)
 			print('Iteration #:',str(i))
@@ -196,46 +190,17 @@ with sess:
 			print('Learning Rate:',str(lrate))
 			print('Loss:',str(totalLoss))
 
-
 			if debug:
 				print("Input Range:",sess.run(m.gray_im[0,3:7,3:7,:]))
 				print("Output Range:", sess.run(m.reshaped_output[0,3:7,3:7,:], feed_dict={m.temp:t}))
-			# print('')
-			# summary = sess.run(m.summaries, feed_dict={lr: lrate, m.temp:t})
-			# summary, summary2 = sess.run([m.summaries, l.summaries], feed_dict={lr: lrate})
 			writer.add_summary(summary,i+1)
-			# writer.flush()
-			# print_network()
-			# writer.add_summary(summary,global_step=i+1)
-			# writer.add_summary(summary2, global_step=i+1)
-			# tf.summary.scalar('loss',summ
 
-			# values = sess.run(m.softmax[0, 16, :, :], feed_dict={m.temp:t})
+
 			values = sess.run(m.softmax[0, 16, :, :], feed_dict={m.temp:t})
-			# tf.summary.scalar('loss',l)
 			for j in range(28):
 				log_histogram(writer, 'coeff' + str(j), values[j,:],i)
-		# print(summary[1])
 
 		if (i+1) % 50 == 0 and t<=5:
 			t += 0.05
-
-			# with tf.variable_scope('conv1_1', reuse=True):
-			# 	conv1_1_weights = tf.get_variable('filter')
-			# with tf.variable_scope('conv6_1', reuse=True):
-			# 	conv6_1_weights = tf.get_variable('weight')
-			# print(sess.run([tf.reduce_mean(conv1_1_weights), tf.reduce_mean(conv6_1_weights)]))
-			# print(sess.run([tf.reduce_mean(tf.gradients(l.loss, [conv1_1_weights])),
-			# 	            tf.reduce_mean(tf.gradients(l.loss, [conv6_1_weights]))]))
-
-
-
-			# print("decoder mean", sess.run(tf.reduce_mean(m.conv5_3)))
-			# print('softmax',sess.run(m.lp[0,0,0,:]))
-			# print('rescaled softmax', sess.run(m.x_re[0,0,0,:]))
-
-			# print("grad: ",sess.run(tf.gradients(m.softmax, [m.x_re]))[0][0,0,0,:])
-			# print(sess.run(tf.reduce_mean(tf.gradients(m.conv11, [m.flat_softmax]))))
-
 #######################################################
 

@@ -1,16 +1,13 @@
 import tensorflow as tf
 import numpy as np 
 
-from EntropyRegularizer import *
-from VarianceRegularizer import *
+# from EntropyRegularizer import *
+# from VarianceRegularizer import *
 
 class LossLayer:
 	def __init__(self,y,y_pred):
-		# self.entropy = 5e-3 * self.entropy_loss(y_pred)
-		self.mse = (self.MSE2(y,y_pred))  #+ (3e-5*self.variance_loss(y_pred))
-
-		# tf.summary.scalar('entropy',self.entropy)
-		tf.summary.scalar('loss',self.mse)
+		self.mse = self.MSE2(y,y_pred) 
+		tf.summary.scalar('mse_loss',self.mse)
 		self.summaries = tf.summary.merge_all()
 
 	def entropy_loss(self,y_pred):

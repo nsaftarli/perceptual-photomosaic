@@ -50,7 +50,7 @@ class VGG16:
 
 		self.output = self.pool5
 
-
+		# self.print_vgg()
 
 
 	def conv_layer(self, x, name, trainable):
@@ -70,6 +70,21 @@ class VGG16:
 
 	def get_vgg_biases(self, name, trainable):
 		return tf.get_variable(initializer=self.vgg_weights[name][1], name='biases', trainable=trainable)
+
+	def print_vgg(self):
+		print(self.conv1_1.get_shape())
+		print(self.conv1_2.get_shape())
+		print(self.conv2_1.get_shape())
+		print(self.conv2_2.get_shape())
+		print(self.conv3_1.get_shape())
+		print(self.conv3_2.get_shape())
+		print(self.conv3_3.get_shape())
+		print(self.conv4_1.get_shape())
+		print(self.conv4_2.get_shape())
+		print(self.conv4_3.get_shape())
+		print(self.conv5_1.get_shape())
+		print(self.conv5_2.get_shape())
+		print(self.conv5_3.get_shape())
 
 
 if __name__ == '__main__':

@@ -5,8 +5,8 @@ from TemplateLayer import *
 
 
 ##Regularizers
-from EntropyRegularizer import *
-from VarianceRegularizer import *
+# from EntropyRegularizer import *
+# from VarianceRegularizer import *
 
 
 #Loss
@@ -18,3 +18,4 @@ from LossLayer import *
 # from LayerNorm import *
 
 from Normalization import *
+from Regularizers import *
