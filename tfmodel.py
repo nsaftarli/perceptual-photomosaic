@@ -37,40 +37,8 @@ class ASCIINet:
 
 
 		#################Decoder##################################################################################
-		#################Block 6#################
-		with tf.name_scope('block_6'):
-				self.up6 = UpSampleLayer(self.decoder_input,scale_factor=2,name='up6')
-				self.conv6_1,_ = ConvLayer(self.up6, name='conv6_1', ksize=3, layer_type='Decoder', out_channels=512, norm_type=norm_type)
-				self.conv6_2,_ = ConvLayer(self.conv6_1, name='conv6_2', ksize=3, layer_type='Decoder', out_channels=512, norm_type=norm_type)
-				self.conv6_3,_ = ConvLayer(self.conv6_2, name='conv6_3', ksize=3, layer_type='Decoder', out_channels=512, norm_type=norm_type)
-				self.add6 = tf.add(self.conv6_3,self.encoder.conv5_3, name='add6')
-		#################Block 7#################
-		with tf.name_scope('block_7'):
-				self.up7 = UpSampleLayer(self.add6,scale_factor=2,name='up7')
-				self.conv7_1,_ = ConvLayer(self.up7, name='conv7_1', ksize=3, layer_type='Decoder', out_channels=512, norm_type=norm_type)
-				self.conv7_2,_ = ConvLayer(self.conv7_1, name='conv7_2', ksize=3, layer_type='Decoder', out_channels=512, norm_type=norm_type)
-				self.conv7_3,_ = ConvLayer(self.conv7_2, name='conv7_3', ksize=3, layer_type='Decoder', out_channels=512, norm_type=norm_type)
-				self.add7 = tf.add(self.conv7_3, self.encoder.conv4_3, name='add7')
-		#################Block 8#################
-		with tf.name_scope('block_8'):
-			self.up8 = UpSampleLayer(self.add7,scale_factor=2,name='up8')
-			self.conv8_1,_ = ConvLayer(self.up8, name='conv8_1', ksize=3, layer_type='Decoder', out_channels=256, norm_type=norm_type)
-			self.conv8_2,_ = ConvLayer(self.conv8_1, name='conv8_2', ksize=3, layer_type='Decoder', out_channels=256, norm_type=norm_type)
-			self.conv8_3,_ = ConvLayer(self.conv8_2, name='conv8_3', ksize=3, layer_type='Decoder', out_channels=256, norm_type=norm_type)
-			self.add8 = tf.add(self.conv8_3, self.encoder.conv3_3, name='add8')
-		#################Block 9#################
-		with tf.name_scope('block_9'):
-			self.up9 = UpSampleLayer(self.add8,scale_factor=2,name='up9')
-			self.conv9_1,_ = ConvLayer(self.up9, name='conv9_1', ksize=3, layer_type='Decoder', out_channels=128, norm_type=norm_type)
-			self.conv9_2,_ = ConvLayer(self.conv9_1, name='conv9_2', ksize=3, layer_type='Decoder', out_channels=128, norm_type=norm_type)
-			self.add9 = tf.add(self.conv9_2, self.encoder.conv2_2, name='add9')
-		#################Block 10################
-		with tf.name_scope('block_10'):
-			self.up10 = UpSampleLayer(self.add9,scale_factor=2,name='up10')
-			self.conv10_1,_ = ConvLayer(self.up10, name='conv10_1', ksize=3, layer_type='Decoder', out_channels=64, norm_type=norm_type)
-			self.conv10_2, _ = ConvLayer(self.conv10_1, name='conv10_2', ksize=3, layer_type='Decoder', out_channels=64, norm_type=norm_type)
-			self.add10 = tf.add(self.conv10_2, self.encoder.conv1_2, name='add10')
-		##########################################################################################################
+		with tf.name_scope("CONV"):
+			self.conv,_ = ConvLayer(self.encoder.pool3, name='conv', ksize=1, stride=1, out_channels=NUM_TEMPLATES, patch_size=1, norm_type=norm_type)
 
 
 		#################Other Inputs#############################################################################
@@ -80,10 +48,10 @@ class ASCIINet:
 		##########################################################################################################
 
 		################Softmax###################################################################################
-		self.conv11, self.w = ConvLayer(self.add10, name='softmax', ksize=PATCH_SIZE, stride=PATCH_SIZE, layer_type='Softmax', 
-										out_channels=NUM_TEMPLATES, patch_size=PATCH_SIZE, norm_type=norm_type)
+		# self.conv11, self.w = ConvLayer(self.add10, name='softmax', ksize=PATCH_SIZE, stride=PATCH_SIZE, layer_type='Softmax', 
+										# out_channels=NUM_TEMPLATES, patch_size=PATCH_SIZE, norm_type=norm_type)
 
-		self.softmax = tf.nn.softmax(self.conv11 * self.temp)
+		self.softmax = tf.nn.softmax(self.conv * self.temp)
 		self.reshaped_softmax = tf.reshape(self.softmax,[-1, (IM_SHAPE//PATCH_SIZE) ** 2, 16])
 		##########################################################################################################
 
@@ -98,7 +66,7 @@ class ASCIINet:
 
 		###############Loss and Regularizers######################################################################
 		with tf.name_scope('VGG16_loss'):
-			self.vgg2 = VGG16(input=self.output)
+			self.vgg2 = VGG16(input=self.output,trainable=True)
 
 		self.feature_dict = {
 								'conv1_1_1':self.encoder.conv1_1, 'conv1_1_2':self.vgg2.conv1_1,
@@ -112,11 +80,17 @@ class ASCIINet:
 								'conv5_3_1':self.encoder.conv5_3, 'conv5_3_2':self.vgg2.conv5_3
 							}
 
-		self.entropy = EntropyRegularizer(self.softmax) 
-		self.variance = VarianceRegularizer(self.softmax)
+		self.entropy = EntropyRegularizer(self.softmax) * 1e3
+		self.variance = VarianceRegularizer(self.softmax) * 5e2
 
 		self.f_loss1 = tf.losses.mean_squared_error(self.feature_dict['conv1_2_1'],self.feature_dict['conv1_2_2'])
-		self.loss = self.f_loss1
+		self.f_loss2 = tf.losses.mean_squared_error(self.feature_dict['conv2_2_1'],self.feature_dict['conv2_2_2'])
+		self.f_loss3 = tf.losses.mean_squared_error(self.feature_dict['conv3_3_1'],self.feature_dict['conv3_3_2'])
+		self.f_loss4 = tf.losses.mean_squared_error(self.feature_dict['conv4_3_1'],self.feature_dict['conv4_3_2'])
+		self.f_loss5 = tf.losses.mean_squared_error(self.feature_dict['conv5_3_1'],self.feature_dict['conv5_3_2'])
+
+		self.loss = self.f_loss1 #+ self.f_loss2 + self.f_loss3 + self.f_loss4 + self.f_loss5
+		self.tLoss = self.loss #+ self.entropy + self.variance
 		##########################################################################################################
 
 		self.build_summaries()
@@ -131,7 +105,8 @@ class ASCIINet:
 		tf.summary.scalar('entropy',self.entropy)
 		tf.summary.scalar('variance',self.variance)
 		tf.summary.scalar('temperature',self.temp)
-		tf.summary.scalar('total_loss',self.loss)
+		tf.summary.scalar('vgg_loss',self.loss)
+		tf.summary.scalar('total_loss',self.tLoss)
 
 		# for i in range(16):
 		# 	tf.summary.image('templates', self.template_tensor[..., i:i+1])

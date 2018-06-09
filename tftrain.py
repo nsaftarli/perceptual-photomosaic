@@ -8,6 +8,7 @@ import tensorflow as tf
 import numpy as np 
 import imdata
 
+import math
 
 from tfmodel import *
 from tfoptimizer import * 
@@ -38,6 +39,7 @@ argParser.add_argument('-i','--iterations',dest='iterations',action='store',defa
 argParser.add_argument('-u','--update',dest='update',action='store',default=100,type=int)
 argParser.add_argument('-lr','--learning-rate', dest='lr',action='store',default=1e-6,type=float)
 argParser.add_argument('-db','--debug',dest='debug',action='store',default=False,type=bool)
+argParser.add_argument('-t','--temp',dest='temp', action='store', default=1.0, type=float)
 cmdArgs = argParser.parse_args()
 ##################################################
 
@@ -48,6 +50,7 @@ iterations = cmdArgs.iterations
 update = cmdArgs.update
 base_lr = cmdArgs.lr
 debug = cmdArgs.debug
+t = cmdArgs.temp
 
 ########GPU Settings###########################
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
@@ -139,7 +142,7 @@ x = tf.convert_to_tensor(x,tf.float32)
 
 
 ############Hyper-Parameneters###############
-t = 1.0
+# t = 2.0
 #############################################
 
 
@@ -148,11 +151,12 @@ t = 1.0
 with tf.device('/gpu:'+str(0)):
 	m = ASCIINet(images=x,templates=y)
 	# l = LossLayer(m.gray_im, m.reshaped_output).mse 
-	l = m.loss
+	# l = m.loss
 
-	e = m.entropy
-	v = m.variance
-	tLoss = l+e+v
+	# e = m.entropy
+	# v = m.variance
+	tLoss = m.tLoss
+	# tLoss = l
 	# l1 = LossLayer(m.feature_dict['conv1_2_1'], m.feature_dict['conv1_2_2'])
 	# l2 = LossLayer(m.feature_dict['conv2_2_1'], m.feature_dict['conv2_2_2'])
 	# l3 = LossLayer(m.feature_dict['conv3_3_1'], m.feature_dict['conv3_3_2'])
@@ -171,6 +175,7 @@ with sess:
 
 	for i in range(iterations):
 		startTime = time.time()
+		# print('temperature: ' + str(t))
 
 		if i == 0:
 			lrate = base_lr
@@ -186,7 +191,8 @@ with sess:
 
 			# lrate = lr_schedule(base_lr,i)
 			print('Iteration #:',str(i))
-			print('Iterations per second:',str(itPerSec))
+			print('temperature: ' + str(t))
+			# print('Iterations per second:',str(itPerSec))
 			print('Learning Rate:',str(lrate))
 			print('Loss:',str(totalLoss))
 
@@ -200,7 +206,14 @@ with sess:
 			for j in range(28):
 				log_histogram(writer, 'coeff' + str(j), values[j,:],i)
 
-		if (i+1) % 50 == 0 and t<=5:
-			t += 0.05
+		# if (i+1) % 50 == 0 and t<=1000:
+		# 	print(t)
+		# 	if t < 100:
+		# 		if i < 2000:
+		# 			t += 0.1
+		# 		else: 
+		# 			t += 0.3
+
+		t += 0.001
 #######################################################
 
