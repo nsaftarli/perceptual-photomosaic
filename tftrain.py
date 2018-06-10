@@ -189,6 +189,8 @@ with sess:
 			print('Iterations per second:',str(itPerSec))
 			print('Learning Rate:',str(lrate))
 			print('Loss:',str(totalLoss))
+			print('Temperature:',str(t))
+			print('##################################')
 
 			if debug:
 				print("Input Range:",sess.run(m.gray_im[0,3:7,3:7,:]))
@@ -200,7 +202,8 @@ with sess:
 			for j in range(28):
 				log_histogram(writer, 'coeff' + str(j), values[j,:],i)
 
-		if (i+1) % 50 == 0 and t<=5:
-			t += 0.05
+		# if (i+1) % 100 == 0 and t<=5:
+			# t += 0.05
+		# t += 0.01
 #######################################################
 
