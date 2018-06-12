@@ -136,8 +136,8 @@ y = imdata.get_templates()
 
 
 ############Pebbles Test#####################
-x = imdata.get_pebbles(path='./pebbles.jpg')
-x = tf.convert_to_tensor(x,tf.float32)
+# x = imdata.get_pebbles(path='./pebbles.jpg')
+# x = tf.convert_to_tensor(x,tf.float32)
 #############################################
 
 
@@ -181,7 +181,7 @@ with sess:
 			lrate = base_lr
 			print_network()
 
-		lrate = lr_schedule(base_lr,i)
+		# lrate = lr_schedule(base_lr,i)
 		feed_dict = {lr: lrate, m.temp:t}
 		summary, result, totalLoss = sess.run([merged, opt, tLoss], feed_dict=feed_dict)
 

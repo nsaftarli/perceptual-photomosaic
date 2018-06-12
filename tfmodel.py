@@ -80,17 +80,20 @@ class ASCIINet:
 								'conv5_3_1':self.encoder.conv5_3, 'conv5_3_2':self.vgg2.conv5_3
 							}
 
-		self.entropy = EntropyRegularizer(self.softmax) * 1e3
-		self.variance = VarianceRegularizer(self.softmax) * 5e2
+		self.entropy = EntropyRegularizer(self.softmax) * 5e4
+		self.variance = VarianceRegularizer(self.softmax) * 5e4
 
-		self.f_loss1 = tf.losses.mean_squared_error(self.feature_dict['conv1_2_1'],self.feature_dict['conv1_2_2'])
+		print('AAAAAAAAAAA')
+		print(tf.abs(self.feature_dict['conv1_2_2'] - self.feature_dict['conv1_2_1']))
+		self.f_loss1 = tf.losses.mean_squared_error(self.feature_dict['conv1_1_1'],self.feature_dict['conv1_1_2'])
+		# self.f_loss1 = tf.abs(self.feature_dict['conv1_2_2'] - self.feature_dict['conv1_2_1'])
 		self.f_loss2 = tf.losses.mean_squared_error(self.feature_dict['conv2_2_1'],self.feature_dict['conv2_2_2'])
 		self.f_loss3 = tf.losses.mean_squared_error(self.feature_dict['conv3_3_1'],self.feature_dict['conv3_3_2'])
 		self.f_loss4 = tf.losses.mean_squared_error(self.feature_dict['conv4_3_1'],self.feature_dict['conv4_3_2'])
 		self.f_loss5 = tf.losses.mean_squared_error(self.feature_dict['conv5_3_1'],self.feature_dict['conv5_3_2'])
 
 		self.loss = self.f_loss1 #+ self.f_loss2 + self.f_loss3 + self.f_loss4 + self.f_loss5
-		self.tLoss = self.loss #+ self.entropy + self.variance
+		self.tLoss = self.loss #+ self.entropy #+ self.variance
 		##########################################################################################################
 
 		self.build_summaries()
@@ -104,9 +107,22 @@ class ASCIINet:
 
 		tf.summary.scalar('entropy',self.entropy)
 		tf.summary.scalar('variance',self.variance)
-		tf.summary.scalar('temperature',self.temp)
+		# tf.summary.scalar('temperature',self.temp)
 		tf.summary.scalar('vgg_loss',self.loss)
 		tf.summary.scalar('total_loss',self.tLoss)
+
+
+		tf.summary.image('e_1',tf.reduce_mean(self.encoder.conv1_1,axis=-1,keep_dims=True))
+		tf.summary.image('e_2',tf.reduce_mean(self.encoder.conv2_1,axis=-1,keep_dims=True))
+		tf.summary.image('e_3',tf.reduce_mean(self.encoder.conv3_1,axis=-1,keep_dims=True))
+		tf.summary.image('e_4',tf.reduce_mean(self.encoder.conv4_1,axis=-1,keep_dims=True))
+		tf.summary.image('e_5',tf.reduce_mean(self.encoder.conv5_1,axis=-1,keep_dims=True))
+
+		tf.summary.image('v_1',tf.reduce_mean(self.vgg2.conv1_1,axis=-1,keep_dims=True))
+		tf.summary.image('v_2',tf.reduce_mean(self.vgg2.conv2_1,axis=-1,keep_dims=True))
+		tf.summary.image('v_3',tf.reduce_mean(self.vgg2.conv3_1,axis=-1,keep_dims=True))
+		tf.summary.image('v_4',tf.reduce_mean(self.vgg2.conv4_1,axis=-1,keep_dims=True))
+		tf.summary.image('v_5',tf.reduce_mean(self.vgg2.conv5_1,axis=-1,keep_dims=True))
 
 		# for i in range(16):
 		# 	tf.summary.image('templates', self.template_tensor[..., i:i+1])
