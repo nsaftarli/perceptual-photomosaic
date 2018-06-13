@@ -131,7 +131,7 @@ x = sess.run(next_batch)
 print(x.shape)
 x = tf.convert_to_tensor(x,tf.float32)
 
-y = imdata.get_templates()
+y = imdata.get_templates(path='./assets/char_set_full/', num_chars=64)
 
 
 
@@ -214,6 +214,6 @@ with sess:
 		# 		else: 
 		# 			t += 0.3
 
-		# t += 0.001
+		t += 0.01
 #######################################################
 

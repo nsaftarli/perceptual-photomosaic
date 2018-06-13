@@ -1,9 +1,9 @@
 import tensorflow as tf 
 import numpy as np 
 
-def log_histogram(writer, tag, values, step, bins=16):
+def log_histogram(writer, tag, values, step, bins=64):
 	values = np.array(values)
-	bin_edges = np.linspace(0,15,num=bins)
+	bin_edges = np.linspace(0,63,num=bins)
 
 
 	hist = tf.HistogramProto()
