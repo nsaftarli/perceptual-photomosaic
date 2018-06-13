@@ -1,6 +1,7 @@
 import tensorflow as tf 
 import numpy as np 
 from layers import *
+from utils import *
 from VGG16 import *
 
 
@@ -38,7 +39,13 @@ class ASCIINet:
 
 		#################Decoder##################################################################################
 		with tf.name_scope("CONV"):
-			self.conv,_ = ConvLayer(self.encoder.pool3, name='conv', ksize=1, stride=1, out_channels=NUM_TEMPLATES, patch_size=1, norm_type=norm_type)
+			self.conv6,_ = ConvLayer(self.encoder.pool3, name='conv6', ksize=1, stride=1, out_channels=4096, patch_size=1, norm_type=norm_type)
+			self.conv7,_ = ConvLayer(self.conv6, name='conv7', ksize=1, stride=1, out_channels=1024, patch_size=1, norm_type=norm_type)
+			self.conv8,_ = ConvLayer(self.conv7, name='conv8', ksize=1, stride=1, out_channels=512, patch_size=1, norm_type=norm_type)
+			self.conv9,_ = ConvLayer(self.conv8, name='conv9', ksize=1, stride=1, out_channels=256, patch_size=1, norm_type=norm_type)
+			self.conv10,_ = ConvLayer(self.conv9, name='conv10', ksize=1, stride=1, out_channels=128, patch_size=1, norm_type=norm_type)
+			self.conv11,_ = ConvLayer(self.conv10, name='conv11', ksize=1, stride=1, out_channels=64, patch_size=1, norm_type=norm_type)
+			self.conv12,_ = ConvLayer(self.conv11, name='conv12', ksize=1, stride=1, out_channels=NUM_TEMPLATES, patch_size=1, norm_type=norm_type, layer_type='Softmax')
 
 
 		#################Other Inputs#############################################################################
@@ -51,7 +58,7 @@ class ASCIINet:
 		# self.conv11, self.w = ConvLayer(self.add10, name='softmax', ksize=PATCH_SIZE, stride=PATCH_SIZE, layer_type='Softmax', 
 										# out_channels=NUM_TEMPLATES, patch_size=PATCH_SIZE, norm_type=norm_type)
 
-		self.softmax = tf.nn.softmax(self.conv * self.temp)
+		self.softmax = tf.nn.softmax(self.conv12 * self.temp)
 		self.reshaped_softmax = tf.reshape(self.softmax,[-1, (IM_SHAPE//PATCH_SIZE) ** 2, 16])
 		##########################################################################################################
 
@@ -61,12 +68,18 @@ class ASCIINet:
 			self.output = tf.reshape(tf.transpose(tf.reshape(
 				self.output, [batch_size,28,28,8,8]),
 				perm=[0,1,3,2,4]), [batch_size,224,224,1])
-			self.output = tf.tile(self.output,[1,1,1,3])
+			self.view_output = tf.tile(self.output,[1,1,1,3])
+
+		with tf.name_scope('blurred_out'):
+			w = tf.reshape(tf.constant(gauss2d_kernel(shape=(PATCH_SIZE,PATCH_SIZE)), dtype=tf.float32),
+				[PATCH_SIZE,PATCH_SIZE,1,1])
+			self.blurred_out = tf.nn.conv2d(self.output,w,strides=[1,1,1,1],padding='SAME')
+			self.blurred_out = tf.tile(self.blurred_out,[1,1,1,3])
 		##########################################################################################################
 
 		###############Loss and Regularizers######################################################################
 		with tf.name_scope('VGG16_loss'):
-			self.vgg2 = VGG16(input=self.output,trainable=True)
+			self.vgg2 = VGG16(input=self.blurred_out,trainable=True)
 
 		self.feature_dict = {
 								'conv1_1_1':self.encoder.conv1_1, 'conv1_1_2':self.vgg2.conv1_1,
@@ -80,13 +93,11 @@ class ASCIINet:
 								'conv5_3_1':self.encoder.conv5_3, 'conv5_3_2':self.vgg2.conv5_3
 							}
 
-		self.entropy = EntropyRegularizer(self.softmax) * 5e4
+		self.entropy = EntropyRegularizer(self.softmax) * 1e2
 		self.variance = VarianceRegularizer(self.softmax) * 5e4
 
-		print('AAAAAAAAAAA')
-		print(tf.abs(self.feature_dict['conv1_2_2'] - self.feature_dict['conv1_2_1']))
+
 		self.f_loss1 = tf.losses.mean_squared_error(self.feature_dict['conv1_1_1'],self.feature_dict['conv1_1_2'])
-		# self.f_loss1 = tf.abs(self.feature_dict['conv1_2_2'] - self.feature_dict['conv1_2_1'])
 		self.f_loss2 = tf.losses.mean_squared_error(self.feature_dict['conv2_2_1'],self.feature_dict['conv2_2_2'])
 		self.f_loss3 = tf.losses.mean_squared_error(self.feature_dict['conv3_3_1'],self.feature_dict['conv3_3_2'])
 		self.f_loss4 = tf.losses.mean_squared_error(self.feature_dict['conv4_3_1'],self.feature_dict['conv4_3_2'])
@@ -103,7 +114,7 @@ class ASCIINet:
 
 	def build_summaries(self):
 		tf.summary.image('target', self.gray_im, max_outputs=1)
-		tf.summary.image('output', self.output, max_outputs=1)
+		tf.summary.image('output', self.view_output, max_outputs=1)
 
 		tf.summary.scalar('entropy',self.entropy)
 		tf.summary.scalar('variance',self.variance)

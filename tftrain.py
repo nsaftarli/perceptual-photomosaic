@@ -136,8 +136,8 @@ y = imdata.get_templates()
 
 
 ############Pebbles Test#####################
-# x = imdata.get_pebbles(path='./pebbles.jpg')
-# x = tf.convert_to_tensor(x,tf.float32)
+x = imdata.get_pebbles(path='./pebbles.jpg')
+x = tf.convert_to_tensor(x,tf.float32)
 #############################################
 
 
