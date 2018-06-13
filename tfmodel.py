@@ -6,7 +6,7 @@ from VGG16 import *
 
 
 VGG_MEAN = [103.939, 116.779, 123.68]
-NUM_TEMPLATES = 16
+NUM_TEMPLATES = 64
 PATCH_SIZE=8
 IM_SHAPE = 224
 norm_type='group'
@@ -19,9 +19,15 @@ class ASCIINet:
 
 
 	def build_network(self,input, templates, batch_size):
-
+		w = tf.reshape(tf.constant(gauss2d_kernel(shape=(PATCH_SIZE,PATCH_SIZE), sigma=2), dtype=tf.float32),
+			[PATCH_SIZE,PATCH_SIZE,1,1])
 		with tf.name_scope('input'):
-			self.input = input
+			r,g,b = tf.split(input, 3, axis=3)
+			r = tf.nn.conv2d(r,w,strides=[1,1,1,1], padding='SAME')
+			g = tf.nn.conv2d(g,w,strides=[1,1,1,1], padding='SAME')
+			b = tf.nn.conv2d(b,w,strides=[1,1,1,1], padding='SAME')
+
+			self.input = tf.concat([r,g,b],axis=3)
 
 		with tf.name_scope('grayscale_input'):
 			self.gray_im = tf.reduce_mean(self.input,axis=-1, keep_dims=True)
@@ -59,11 +65,14 @@ class ASCIINet:
 										# out_channels=NUM_TEMPLATES, patch_size=PATCH_SIZE, norm_type=norm_type)
 
 		self.softmax = tf.nn.softmax(self.conv12 * self.temp)
-		self.reshaped_softmax = tf.reshape(self.softmax,[-1, (IM_SHAPE//PATCH_SIZE) ** 2, 16])
+		self.reshaped_softmax = tf.reshape(self.softmax,[-1, (IM_SHAPE//PATCH_SIZE) ** 2, NUM_TEMPLATES])
 		##########################################################################################################
 
 		###############Output#####################################################################################
 		with tf.name_scope('output_and_tile'):
+			print('AAAAAAAAAAAAA')
+			print(self.reshaped_softmax.get_shape())
+			print(self.template_tensor.get_shape())
 			self.output = tf.matmul(self.reshaped_softmax,self.template_tensor)
 			self.output = tf.reshape(tf.transpose(tf.reshape(
 				self.output, [batch_size,28,28,8,8]),
@@ -71,10 +80,9 @@ class ASCIINet:
 			self.view_output = tf.tile(self.output,[1,1,1,3])
 
 		with tf.name_scope('blurred_out'):
-			w = tf.reshape(tf.constant(gauss2d_kernel(shape=(PATCH_SIZE,PATCH_SIZE)), dtype=tf.float32),
-				[PATCH_SIZE,PATCH_SIZE,1,1])
 			self.blurred_out = tf.nn.conv2d(self.output,w,strides=[1,1,1,1],padding='SAME')
 			self.blurred_out = tf.tile(self.blurred_out,[1,1,1,3])
+
 		##########################################################################################################
 
 		###############Loss and Regularizers######################################################################
@@ -93,8 +101,8 @@ class ASCIINet:
 								'conv5_3_1':self.encoder.conv5_3, 'conv5_3_2':self.vgg2.conv5_3
 							}
 
-		self.entropy = EntropyRegularizer(self.softmax) * 1e2
-		self.variance = VarianceRegularizer(self.softmax) * 5e4
+		self.entropy = EntropyRegularizer(self.softmax) * 1e4
+		self.variance = VarianceRegularizer(self.softmax) * 1e4
 
 
 		self.f_loss1 = tf.losses.mean_squared_error(self.feature_dict['conv1_1_1'],self.feature_dict['conv1_1_2'])
@@ -103,8 +111,8 @@ class ASCIINet:
 		self.f_loss4 = tf.losses.mean_squared_error(self.feature_dict['conv4_3_1'],self.feature_dict['conv4_3_2'])
 		self.f_loss5 = tf.losses.mean_squared_error(self.feature_dict['conv5_3_1'],self.feature_dict['conv5_3_2'])
 
-		self.loss = self.f_loss1 #+ self.f_loss2 + self.f_loss3 + self.f_loss4 + self.f_loss5
-		self.tLoss = self.loss #+ self.entropy #+ self.variance
+		self.loss = self.f_loss1 + self.f_loss2 + self.f_loss3 + self.f_loss4 + self.f_loss5#+ self.f_loss2 + self.f_loss3 + self.f_loss4 + self.f_loss5
+		self.tLoss = self.loss #+ self.entropy + self.variance
 		##########################################################################################################
 
 		self.build_summaries()
@@ -118,7 +126,7 @@ class ASCIINet:
 
 		tf.summary.scalar('entropy',self.entropy)
 		tf.summary.scalar('variance',self.variance)
-		# tf.summary.scalar('temperature',self.temp)
+		tf.summary.scalar('temperature',self.temp)
 		tf.summary.scalar('vgg_loss',self.loss)
 		tf.summary.scalar('total_loss',self.tLoss)
 
