@@ -5,16 +5,15 @@ import os
 import time
 import argparse
 import tensorflow as tf
-import numpy as np 
+import numpy as np
 import imdata
-
 import math
-
 from tfmodel import *
-from tfoptimizer import * 
+from tfoptimizer import *
 from layers import LossLayer
-
 from utils import *
+import scipy.misc as misc
+
 
 '''Data constants'''
 const = constants.Constants()
@@ -34,12 +33,12 @@ experiments_dir = const.experiments_dir
 
 ####Command line arguments#######################
 argParser = argparse.ArgumentParser(description='training')
-argParser.add_argument('-g','--gpu',dest="gpu",action="store",default=1,type=int)
-argParser.add_argument('-i','--iterations',dest='iterations',action='store',default=0,type=int)
-argParser.add_argument('-u','--update',dest='update',action='store',default=100,type=int)
-argParser.add_argument('-lr','--learning-rate', dest='lr',action='store',default=1e-6,type=float)
-argParser.add_argument('-db','--debug',dest='debug',action='store',default=False,type=bool)
-argParser.add_argument('-t','--temp',dest='temp', action='store', default=1.0, type=float)
+argParser.add_argument('-g', '--gpu', dest="gpu", action="store", default=1, type=int)
+argParser.add_argument('-i', '--iterations', dest='iterations', action='store', default=0, type=int)
+argParser.add_argument('-u', '--update', dest='update', action='store', default=100, type=int)
+argParser.add_argument('-lr', '--learning-rate',  dest='lr', action='store', default=1e-6, type=float)
+argParser.add_argument('-db', '--debug', dest='debug', action='store', default=False, type=bool)
+argParser.add_argument('-t', '--temp', dest='temp',  action='store',  default=1.0,  type=float)
 cmdArgs = argParser.parse_args()
 ##################################################
 
@@ -62,82 +61,21 @@ sess = tf.Session(config=config)
 ################################################
 
 
-
-
-
-def print_network():
-	return
-	print('Loss:',str(sess.run(l.loss)))
-	print("Conv6_1",sess.run(m.conv6_1[0,0,0,:]))
-	print("Conv6_2",sess.run(m.conv6_2[0,0,0,:]))
-	print("Conv6_3",sess.run(m.conv6_3[0,0,0,:]))
-	print("Add6",sess.run(m.add6[0,0,0,:]))
-
-	print("Conv7_1",sess.run(m.conv7_1[0,0,0,:]))
-	print("Conv7_2",sess.run(m.conv7_2[0,0,0,:]))
-	print("Conv7_3",sess.run(m.conv7_3[0,0,0,:]))
-	print("Add7",sess.run(m.add7[0,0,0,:]))
-
-
-	print("Conv8_1",sess.run(m.conv8_1[0,0,0,:]))
-	print("Conv8_2",sess.run(m.conv8_2[0,0,0,:]))
-	print("Conv8_3",sess.run(m.conv8_3[0,0,0,:]))
-	print("Add8",sess.run(m.add8[0,0,0,:]))
-
-
-
-	print("Conv9_1",sess.run(m.conv9_1[0,0,0,:]))
-	print("Conv9_2",sess.run(m.conv9_2[0,0,0,:]))
-	print("Add9",sess.run(m.add9[0,0,0,:]))
-
-
-	print("Conv10_1",sess.run(m.conv10_1[0,0,0,:]))
-
-	print("Conv10_2",sess.run(m.conv10_2[0,0,0,:]))
-	print("Add10:", sess.run(m.add10[0,0,0,:]))
-	print("Conv11:", sess.run(m.conv11[0,0,0,:]))
-
-	# print("Batch11:", sess.run(m.batch11[0,0,0,:]))
-
-
-	print("Softmax:", sess.run(m.softmax[0,0,0,:]))
-	print("w:", sess.run(m.w[:,:,:,0]))
-	print("Wshape:",sess.run(m.w).shape)
-	print("w2:", sess.run(m.w2))
-	print("w2shape",sess.run(m.w2).shape)
-
-	# print("Input Range:",sess.run(m.gray_im[0,1:6,1:6,:]))
-	# print("Output Range:", sess.run(m.reshaped_output[0,1:6,1:6,:]))
-
-
-
-
 ############Data Input######################
-dataset = tf.data.Dataset.from_generator(imdata.load_data, (tf.float32))
-it = dataset.make_one_shot_iterator()
-next_batch = it.get_next()
+dataset = tf.data.Dataset.from_generator(imdata.load_data,  (tf.float32))
+next_batch = dataset.make_one_shot_iterator().get_next()
+# next_batch = it.get_next()
 #########################################
 
-
-
-##########Logger########################
-# writer = tf.summary.FileWriter('./logs/',sess.graph)
-########################################
-
-
-
-
 x = sess.run(next_batch)
-print(x.shape)
-x = tf.convert_to_tensor(x,tf.float32)
-
-y = imdata.get_templates(path='./assets/char_set_full/', num_chars=64)
+x = tf.convert_to_tensor(x, tf.float32)
+y = imdata.get_templates(path='./assets/char_set_alt/',  num_chars=62)
 
 
 
 ############Pebbles Test#####################
 # x = imdata.get_pebbles(path='./pebbles.jpg')
-# x = tf.convert_to_tensor(x,tf.float32)
+# x = tf.convert_to_tensor(x, tf.float32)
 #############################################
 
 
@@ -146,74 +84,69 @@ y = imdata.get_templates(path='./assets/char_set_full/', num_chars=64)
 #############################################
 
 
-
 ##############Build Graph###################
 with tf.device('/gpu:'+str(0)):
-	m = ASCIINet(images=x,templates=y)
-	# l = LossLayer(m.gray_im, m.reshaped_output).mse 
-	# l = m.loss
-
-	# e = m.entropy
-	# v = m.variance
-	tLoss = m.tLoss
-	# tLoss = l
-	# l1 = LossLayer(m.feature_dict['conv1_2_1'], m.feature_dict['conv1_2_2'])
-	# l2 = LossLayer(m.feature_dict['conv2_2_1'], m.feature_dict['conv2_2_2'])
-	# l3 = LossLayer(m.feature_dict['conv3_3_1'], m.feature_dict['conv3_3_2'])
-	# l4 = LossLayer(m.feature_dict['conv4_3_1'], m.feature_dict['conv4_3_2'])
-	# l5 = LossLayer(m.feature_dict['conv5_3_1'], m.feature_dict['conv5_3_2'])
-	# opt, lr = optimize(1 * l.loss + (1e2*l1.loss) + (1e0*l2.loss) + (1e0*l3.loss) + (1e3*l4.loss) + (1e3*l5.loss))
-	opt, lr = optimize(tLoss)
+    m = ASCIINet(images=x, templates=y)
+    tLoss = m.tLoss
+    opt,  lr = optimize(tLoss)
 merged = tf.summary.merge_all()
 ############################################
 
+chkpt = tf.train.Saver()
+lrate = base_lr
+
+print('AAAAAAAAAAAAAAAAAAAAAA')
+print(next_batch)
 ############Training################################
-
 with sess:
-	sess.run(tf.global_variables_initializer())
-	writer = tf.summary.FileWriter('./logs/',sess.graph)
+    sess.run(tf.global_variables_initializer())
+    writer = tf.summary.FileWriter('./logs/', sess.graph)
 
-	for i in range(iterations):
-		startTime = time.time()
-		# print('temperature: ' + str(t))
+    for i in range(iterations):
+        x = sess.run(next_batch)
+        x = tf.convert_to_tensor(x, tf.float32)
 
-		if i == 0:
-			lrate = base_lr
-			print_network()
+        startTime = time.time()
+        feed_dict = {lr: lrate,  m.temp: t}
+        summary,  result,  totalLoss = sess.run([merged,  opt,  tLoss],
+                                                feed_dict=feed_dict)
 
-		# lrate = lr_schedule(base_lr,i)
-		feed_dict = {lr: lrate, m.temp:t}
-		summary, result, totalLoss = sess.run([merged, opt, tLoss], feed_dict=feed_dict)
+        if i % update == 0:
+            print('Iteration #:', str(i))
+            print('temperature: ' + str(t))
+            print('Learning Rate:', str(lrate))
+            print('Loss:', str(totalLoss))
 
-		if i % update == 0:
-			now = time.time() - startTime
-			itPerSec = update / now
+            if debug:
+                print("Input Range:", sess.run(m.gray_im[0, 3:7, 3:7, :]))
+                print("Output Range:", sess.run(m.reshaped_output[0, 3:7, 3:7, :],  feed_dict={m.temp: t}))
+            writer.add_summary(summary, i+1)
 
-			# lrate = lr_schedule(base_lr,i)
-			print('Iteration #:',str(i))
-			print('temperature: ' + str(t))
-			# print('Iterations per second:',str(itPerSec))
-			print('Learning Rate:',str(lrate))
-			print('Loss:',str(totalLoss))
+            values = sess.run(m.softmax[0,  17, :, :],  feed_dict={m.temp: t})
+            for j in range(28):
+                log_histogram(writer,  'coeff' + str(j),  values[j, :], i)
 
-			if debug:
-				print("Input Range:",sess.run(m.gray_im[0,3:7,3:7,:]))
-				print("Output Range:", sess.run(m.reshaped_output[0,3:7,3:7,:], feed_dict={m.temp:t}))
-			writer.add_summary(summary,i+1)
+            print(sess.run(m.conv12[0, 0, 0, :]))
+            print(sess.run(m.conv12[0, 0, 0, :] * t))
+            print(sess.run(m.softmax[0, 0, 0, :],  feed_dict={m.temp: t}))
+
+            chkpt.save(sess,"snapshots/a/checkpoint2.ckpt")
+            # misc.imsave("snapshots/a/img.jpg",sess.run(m.view_output[0], feed_dict={m.temp: t}))
 
 
-			values = sess.run(m.softmax[0, 16, :, :], feed_dict={m.temp:t})
-			for j in range(28):
-				log_histogram(writer, 'coeff' + str(j), values[j,:],i)
+        # if i % 1000 == 0 and i > 0:
+            # t += 14
 
-		# if (i+1) % 50 == 0 and t<=1000:
-		# 	print(t)
-		# 	if t < 100:
-		# 		if i < 2000:
-		# 			t += 0.1
-		# 		else: 
-		# 			t += 0.3
+        if i > 1 and i % 1000 == 0:
+            if i < 10000:
+                t *= 2
+        # if (i+1) % 50 == 0 and t<=1000:
+        #   print(t)
+        #   if t < 100:
+        #       if i < 2000:
+        #           t += 0.1
+        #       else:
+        #           t += 0.3
 
-		t += 0.01
+        # t += 0.1
 #######################################################
-

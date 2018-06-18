@@ -1,4 +1,5 @@
-import tensorflow as tf 
+import tensorflow as tf
+
 
 def TemplateLayer(templates, rgb=False):
-	return tf.constant(value=templates, dtype=tf.float32, shape=templates.shape, name='templates')
+    return tf.constant(value=templates, dtype=tf.float32, shape=templates.shape, name='templates')
