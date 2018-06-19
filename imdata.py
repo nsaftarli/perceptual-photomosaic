@@ -6,6 +6,8 @@ from PIL import Image
 # from constants import Constants
 from utils.constants import Constants
 import tensorflow as tf
+import itertools
+import sys
 
 
 ###############################################
@@ -24,7 +26,7 @@ char_dict = const.char_dict
 train_set_size = const.train_set_size
 
 
-def load_data(num_batches=32,
+def load_data(num_batches=100,
               batch_size=6,
               img_rows=224,
               img_cols=224,
@@ -64,7 +66,50 @@ def load_data(num_batches=32,
         if test:
             break
 
-        yield (x)
+        yield (x,i)
+
+def load_data_gen(num_batches=100,
+                  batch_size=6,
+                  img_rows=224,
+                  img_cols=224):
+    ind = 0
+
+    while True:
+        x = np.zeros((batch_size, img_rows, img_cols, 3), dtype='uint8')
+
+
+        for i in itertools.count(ind,1):
+            if ind == 6000:
+                ind = 0
+                break
+            imgpath = img_data_dir + 'in_' + str(i) + '.jpg'
+            img = Image.open(imgpath)
+            x[ind-i] = np.asarray(img, dtype='uint8')
+            if i == ind + 6:
+                ind += 6
+                yield x,i
+
+# def load_val_data_gen(num_batches=100,
+#                       batch_size=6,
+#                       img_rows=224,
+#                       img_cols=224):
+
+
+
+
+
+
+
+
+def load_data_static(num=10000, img_rows=224, img_cols=224):
+        x = np.zeros((num, img_rows, img_cols, 3), dtype='uint8')
+
+        for i in range(num):
+            imgpath = img_data_dir + 'in_' + str(i) + '.jpg'
+            img = Image.open(imgpath)
+            x[i, :, :, :] = np.asarray(img, dtype='uint8')
+
+        return x
 
 
 def get_templates(path='./assets/char_set/', num_chars=16):

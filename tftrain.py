@@ -62,14 +62,39 @@ sess = tf.Session(config=config)
 
 
 ############Data Input######################
-dataset = tf.data.Dataset.from_generator(imdata.load_data,  (tf.float32))
+dataset = tf.data.Dataset.from_generator(imdata.load_data_gen,  (tf.float32,tf.int32))
 next_batch = dataset.make_one_shot_iterator().get_next()
 # next_batch = it.get_next()
 #########################################
 
-x = sess.run(next_batch)
-x = tf.convert_to_tensor(x, tf.float32)
-y = imdata.get_templates(path='./assets/char_set_alt/',  num_chars=62)
+
+
+
+
+
+# x,ind = sess.run(next_batch)
+
+# print('BBBBBBBBBBBBb')
+# print(x.shape)
+# x = tf.convert_to_tensor(x,tf.float32)
+# print(x)
+# print(ind)
+# x,ind = sess.run(next_batch)
+# print(ind)
+# x,ind = sess.run(next_batch)
+# print(ind)
+# # x = tf.convert_to_tensor(x, tf.float32)
+# sess.run(next_batch)
+# print(m)
+y = imdata.get_templates(path='./assets/char_set_alt/', num_chars=62)
+
+# x = imdata.load_data_static()
+
+# dataset = tf.data.Dataset.from_tensor_slices(x).batch(6)
+# print(dataset)
+# iter = dataset.make_one_shot_iterator()
+# el = tf.convert_to_tensor(iter.get_next(), tf.float32)
+# print(sess.run(el))
 
 
 
@@ -78,15 +103,23 @@ y = imdata.get_templates(path='./assets/char_set_alt/',  num_chars=62)
 # x = tf.convert_to_tensor(x, tf.float32)
 #############################################
 
+# input = tf.placeholder(dtype=tf.float32, shape=[])
+# with tf.variable_scope('queuer'):
+#     q = tf.FIFOQueue(capacity=6, dtypes=tf.float32)
+#     enqueue_op = q.enqueue(input)
+#     numberOfThreads = 1
+#     qr = tf.train.QueueRunner(q, [enqueue_op] * numberOfThreads)
+#     tf.train.add_queue_runner(qr)
+#     x = tf.convert_to_tensor(q.dequeue(),tf.float32)
 
-############Hyper-Parameneters###############
-# t = 2.0
-#############################################
+
+
 
 
 ##############Build Graph###################
 with tf.device('/gpu:'+str(0)):
-    m = ASCIINet(images=x, templates=y)
+    input = tf.placeholder(tf.float32, shape=(6,224,224,3))
+    m = ASCIINet(images=input, templates=y)
     tLoss = m.tLoss
     opt,  lr = optimize(tLoss)
 merged = tf.summary.merge_all()
@@ -102,38 +135,47 @@ with sess:
     sess.run(tf.global_variables_initializer())
     writer = tf.summary.FileWriter('./logs/', sess.graph)
 
-    for i in range(iterations):
-        x = sess.run(next_batch)
-        x = tf.convert_to_tensor(x, tf.float32)
+    
+    # coord = tf.train.Coordinator()
+    # threads = tf.train.start_queue_runners(coord=coord)
 
-        startTime = time.time()
-        feed_dict = {lr: lrate,  m.temp: t}
+
+    for i in range(iterations):
+        x,ind = sess.run(next_batch)
+        # print("Ind: " + str(ind))
+        # x = tf.convert_to_tensor(x,tf.float32)
+
+        feed_dict = {input: x,lr: lrate,  m.temp: t}
         summary,  result,  totalLoss = sess.run([merged,  opt,  tLoss],
                                                 feed_dict=feed_dict)
+
+        # writer.add_summary(summary,i+1)
 
         if i % update == 0:
             print('Iteration #:', str(i))
             print('temperature: ' + str(t))
             print('Learning Rate:', str(lrate))
             print('Loss:', str(totalLoss))
+            print('Index:', ind)
 
             if debug:
                 print("Input Range:", sess.run(m.gray_im[0, 3:7, 3:7, :]))
                 print("Output Range:", sess.run(m.reshaped_output[0, 3:7, 3:7, :],  feed_dict={m.temp: t}))
             writer.add_summary(summary, i+1)
 
-            values = sess.run(m.softmax[0,  17, :, :],  feed_dict={m.temp: t})
+            values = sess.run(m.softmax[0,  17, :, :],  feed_dict={input: x,m.temp: t})
             for j in range(28):
                 log_histogram(writer,  'coeff' + str(j),  values[j, :], i)
 
-            print(sess.run(m.conv12[0, 0, 0, :]))
-            print(sess.run(m.conv12[0, 0, 0, :] * t))
-            print(sess.run(m.softmax[0, 0, 0, :],  feed_dict={m.temp: t}))
+            # print(sess.run(m.conv12[0, 0, 0, :]))
+            # print(sess.run(m.conv12[0, 0, 0, :] * t))
+            print('here::::::::::::::::::')
+            print(sess.run(m.softmax[0, 0, 0, :],  feed_dict={input: x, m.temp: t}))
 
             chkpt.save(sess,"snapshots/a/checkpoint2.ckpt")
-            # misc.imsave("snapshots/a/img.jpg",sess.run(m.view_output[0], feed_dict={m.temp: t}))
+            misc.imsave("snapshots/a/img.jpg", sess.run(m.view_output[0], feed_dict={input: x, m.temp: t}))
 
-
+        # print("It: " + str(i))
         # if i % 1000 == 0 and i > 0:
             # t += 14
 

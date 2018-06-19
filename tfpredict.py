@@ -65,25 +65,26 @@ next_batch = dataset.make_one_shot_iterator().get_next()
 # next_batch = it.get_next()
 #########################################
 
-x = sess.run(next_batch)
-x = sess.run(next_batch)
-x = sess.run(next_batch)
-x = sess.run(next_batch)
-x = sess.run(next_batch)
-x = tf.convert_to_tensor(x, tf.float32)
-y = imdata.get_templates(path='./assets/char_set_alt/',  num_chars=62)
-print(x)
-
-
-# x = imdata.get_pebbles(path='./pebbles.jpg')
+# x = sess.run(next_batch)
+# x = sess.run(next_batch)
+# x = sess.run(next_batch)
+# x = sess.run(next_batch)
+# x = sess.run(next_batch)
 # x = tf.convert_to_tensor(x, tf.float32)
+y = imdata.get_templates(path='./assets/char_set_alt/',  num_chars=62)
+# print(x)
+
+
+x = imdata.get_pebbles(path='./kosta.jpg')
+x = tf.convert_to_tensor(x, tf.float32)
 
 
 with tf.device('/gpu:'+str(0)):
-    m = ASCIINet(images=x, templates=y)
+    m = ASCIINet(images=x, templates=y, batch_size=1)
     tLoss = m.tLoss
     opt,  lr = optimize(tLoss)
     argmax = tf.one_hot(tf.argmax(m.softmax, axis=-1),depth=62)
+    o = predictTop(argmax, m.template_tensor)
     print(m.softmax)
     print(argmax)
 merged = tf.summary.merge_all()
@@ -102,5 +103,5 @@ with sess:
         summary,  result,  totalLoss = sess.run([merged,  opt,  tLoss],
                                         feed_dict=feed_dict)
         print(totalLoss)
-        misc.imsave("snapshots/a/img2.jpg",sess.run(m.view_output[0], feed_dict={m.temp: t}))
+        misc.imsave("snapshots/a/img3.jpg",sess.run(o[0], feed_dict={m.temp: t}))
     print("Model restored")
