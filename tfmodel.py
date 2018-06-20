@@ -106,11 +106,11 @@ class ASCIINet:
         self.entropy = EntropyRegularizer(self.softmax) * 1e3
         self.variance = VarianceRegularizer(self.softmax) * 1e2
 
-        self.f_loss1 = tf.losses.mean_squared_error(self.feature_dict['conv1_1_1'], self.feature_dict['conv1_1_2'])
-        self.f_loss2 = tf.losses.mean_squared_error(self.feature_dict['conv2_1_1'], self.feature_dict['conv2_1_2'])
-        self.f_loss3 = tf.losses.mean_squared_error(self.feature_dict['conv3_1_1'], self.feature_dict['conv3_1_2'])
-        self.f_loss4 = tf.losses.mean_squared_error(self.feature_dict['conv4_1_1'], self.feature_dict['conv4_1_2'])
-        self.f_loss5 = tf.losses.mean_squared_error(self.feature_dict['conv5_1_1'], self.feature_dict['conv5_1_2'])
+        self.f_loss1 = tf.losses.mean_squared_error(self.encoder.conv1_1, self.vgg2.conv1_1)
+        self.f_loss2 = tf.losses.mean_squared_error(self.encoder.conv2_1, self.vgg2.conv2_1)
+        self.f_loss3 = tf.losses.mean_squared_error(self.encoder.conv3_1, self.vgg2.conv3_1)
+        self.f_loss4 = tf.losses.mean_squared_error(self.encoder.conv4_1, self.vgg2.conv4_1)
+        self.f_loss5 = tf.losses.mean_squared_error(self.encoder.conv5_1, self.vgg2.conv5_1)
 
         self.blur_loss = tf.losses.mean_squared_error(self.vgg4.conv1_1, self.vgg5.conv1_1) + \
             tf.losses.mean_squared_error(self.vgg6.conv1_1, self.vgg7.conv1_1)

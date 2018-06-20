@@ -1,3 +1,6 @@
+import sys
+sys.path.append('layers/')
+sys.path.append('utils/')
 import os
 import numpy as np
 from PIL import Image
@@ -7,7 +10,6 @@ from PIL import Image
 from utils.constants import Constants
 import tensorflow as tf
 import itertools
-import sys
 
 
 ###############################################
@@ -79,7 +81,7 @@ def load_data_gen(num_batches=100,
 
 
         for i in itertools.count(ind,1):
-            if ind == 6000:
+            if ind == 12000:
                 ind = 0
                 break
             imgpath = img_data_dir + 'in_' + str(i) + '.jpg'
@@ -159,5 +161,50 @@ def create_char_img(path='./assets/char_set/0.png'):
             tiles[i:2*i-1, j:2*j-1, :] = im
 
 
+def overlay_img(path='./'):
+    out = np.zeros((224,224,3), dtype='uint8')
+    img = np.asarray(Image.open(path + 'kosta.jpg').resize((224, 224)))
+    txt = np.asarray(Image.open(path + 'snapshots/a/img3.jpg'))
+    out = 0.3 * img + 0.7 * txt
+    im_out = Image.fromarray(out.astype('uint8'))
+    im_out.show()
+
+
+def make_template_ims(path='./assets/temp_pics/',temp_size=8):
+    imgpath = path + 'IMG_1359.JPG'
+    # print(Image.)
+    im = np.asarray(Image.open(imgpath).resize((272, 204)))
+    template = np.zeros((8, 8, 3))
+    print(im.shape)
+    h = im.shape[0]
+    w = im.shape[1]
+    n = 0
+    # for i in range(w // temp_size):
+    #     for j in range(h // temp_size):
+    #         y = np.random.randint(0, 224)
+    #         x = np.random.randint(0, 224)
+    #         template = im[j*temp_size:(j+1)*temp_size, i*temp_size:(i+1)*temp_size, :]
+    #         out = Image.fromarray(template.astype('uint8'))
+    #         # break
+    #         out.save('./assets/cam_templates/' + str(n), 'JPEG')
+    #         n += 1
+
+    for i in range(62):
+        y = np.random.randint(0, 196)
+        x = np.random.randint(0, 264)
+
+        template[:,:,:] = im[y:y+8, x:x+8,:]
+        out = Image.fromarray(template.astype('uint8'))
+        out.save('./assets/cam_templates/' + str(n) + '.png', 'PNG')
+        n += 1
+
+        # break
+    # out.show()
+
+
+
+
 if __name__ == '__main__':
-    create_char_img()
+    # create_char_img()
+    # overlay_img()
+    make_template_ims()

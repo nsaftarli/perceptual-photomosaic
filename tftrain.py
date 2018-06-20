@@ -86,7 +86,8 @@ next_batch = dataset.make_one_shot_iterator().get_next()
 # # x = tf.convert_to_tensor(x, tf.float32)
 # sess.run(next_batch)
 # print(m)
-y = imdata.get_templates(path='./assets/char_set_alt/', num_chars=62)
+# y = imdata.get_templates(path='./assets/char_set_alt/', num_chars=62)
+y = imdata.get_templates(path='./assets/cam_templates/', num_chars=62)
 
 # x = imdata.load_data_static()
 
