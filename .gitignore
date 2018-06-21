@@ -16,6 +16,7 @@ assets/
 __pycache__/
 weights/
 viz/
+snapshots/
 
 #Compiled python and existing models
 *.pyc
