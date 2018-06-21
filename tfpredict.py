@@ -39,6 +39,8 @@ argParser.add_argument('-u', '--update', dest='update', action='store', default=
 argParser.add_argument('-lr', '--learning-rate',  dest='lr', action='store', default=1e-6, type=float)
 argParser.add_argument('-db', '--debug', dest='debug', action='store', default=False, type=bool)
 argParser.add_argument('-t', '--temp', dest='temp',  action='store',  default=1.0,  type=float)
+argParser.add_argument('-v', '--val', dest='val',  action='store',  default=True,  type=bool)
+argParser.add_argument('-c', '--ckpt', dest='ckpt', action='store', default=None)
 cmdArgs = argParser.parse_args()
 ##################################################
 
@@ -49,6 +51,7 @@ update = cmdArgs.update
 base_lr = cmdArgs.lr
 debug = cmdArgs.debug
 t = cmdArgs.temp
+val = cmdArgs.val
 
 ########GPU Settings###########################
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
@@ -60,48 +63,45 @@ sess = tf.Session(config=config)
 ################################################
 
 ############Data Input######################
-dataset = tf.data.Dataset.from_generator(imdata.load_data,  (tf.float32))
-next_batch = dataset.make_one_shot_iterator().get_next()
-# next_batch = it.get_next()
-#########################################
 
-# x = sess.run(next_batch)
-# x = sess.run(next_batch)
-# x = sess.run(next_batch)
-# x = sess.run(next_batch)
-# x = sess.run(next_batch)
-# x = tf.convert_to_tensor(x, tf.float32)
-y = imdata.get_templates(path='./assets/char_set_alt/',  num_chars=62)
-# print(x)
+if val:
+    dataset = tf.data.Dataset.from_generator(imdata.load_val_data_gen,  (tf.float32))
+    next_batch = dataset.make_one_shot_iterator().get_next()
 
+y = imdata.get_templates(path='./assets/cam_templates/',  num_chars=62)
 
-x = imdata.get_pebbles(path='./kosta.jpg')
-x = tf.convert_to_tensor(x, tf.float32)
-
-
+x = sess.run(next_batch)
 with tf.device('/gpu:'+str(0)):
-    m = ASCIINet(images=x, templates=y, batch_size=1)
+    input = tf.placeholder(tf.float32, shape=(6, 224, 224, 3))
+    # m = ASCIINet(images=input, templates=y, batch_size=1)
+    m = ASCIINet(images=input, templates=y, batch_size=6, trainable=False)
     tLoss = m.tLoss
-    opt,  lr = optimize(tLoss)
+    # opt,  lr = optimize(tLoss)
     argmax = tf.one_hot(tf.argmax(m.softmax, axis=-1),depth=62)
-    o = predictTop(argmax, m.template_tensor)
+    o = predictTop(argmax, m.template_tensor, batch_size=6)
     print(m.softmax)
     print(argmax)
 merged = tf.summary.merge_all()
 
 saver = tf.train.Saver()
 
-
 lrate = base_lr
 
 with sess:
     saver.restore(sess, "snapshots/a/checkpoint2.ckpt")
+    writer = tf.summary.FileWriter('./logs/validation', sess.graph)
 
-    for i in range(1):
-        feed_dict = {lr: lrate,  m.temp: t}
 
-        summary,  result,  totalLoss = sess.run([merged,  opt,  tLoss],
-                                        feed_dict=feed_dict)
-        print(totalLoss)
-        misc.imsave("snapshots/a/img3.jpg",sess.run(o[0], feed_dict={m.temp: t}))
+    for i in range(iterations):
+        x = sess.run(next_batch)
+        # print(x[1])
+        feed_dict = {input: x,  m.temp: t}
+
+        summary,  totalLoss = sess.run([merged, tLoss],
+                                       feed_dict=feed_dict)
+
+        if i % update == 0: 
+            print(totalLoss)
+            misc.imsave("snapshots/a/img3.jpg", sess.run(o[0], feed_dict={input: x, m.temp: t}))
+            writer.add_summary(summary, i+1)
     print("Model restored")

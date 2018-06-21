@@ -17,14 +17,15 @@ w = tf.reshape(tf.constant(gauss2d_kernel(shape=(PATCH_SIZE, PATCH_SIZE), sigma=
 
 class ASCIINet:
 
-    def __init__(self, images, templates, weight_path='./weights/vgg16.npy', batch_size=6):
+    def __init__(self, images, templates, weight_path='./weights/vgg16.npy', batch_size=6, trainable=True):
         self.vgg_weights = np.load(weight_path, encoding='latin1').item()
-        self.net = self.build_network(images, templates, batch_size=batch_size)
+        self.net = self.build_network(images, templates, batch_size=batch_size, trainable=trainable)
 
-    def build_network(self, input, templates, batch_size):
+    def build_network(self, input, templates, batch_size, trainable):
 
         # Blur and re-combine input
         self.input = self.blur_recombine(input, w)
+        self.non_blurred = input
 
         # Get grayscale version of image
         with tf.name_scope('grayscale_input'):
@@ -38,13 +39,13 @@ class ASCIINet:
 
         # ################Decoder##################################################################################
         with tf.name_scope("CONV"):
-            self.conv6, _ = ConvLayer(self.encoder.pool3, name='conv6', ksize=1, stride=1, out_channels=4096, patch_size=1, norm_type=norm_type)
-            self.conv7, _ = ConvLayer(self.conv6, name='conv7', ksize=1, stride=1, out_channels=1024, patch_size=1, norm_type=norm_type)
-            self.conv8, _ = ConvLayer(self.conv7, name='conv8', ksize=1, stride=1, out_channels=512, patch_size=1, norm_type=norm_type)
-            self.conv9, _ = ConvLayer(self.conv8, name='conv9', ksize=1, stride=1, out_channels=256, patch_size=1, norm_type=norm_type)
-            self.conv10, _ = ConvLayer(self.conv9, name='conv10', ksize=1, stride=1, out_channels=128, patch_size=1, norm_type=norm_type)
-            self.conv11, _ = ConvLayer(self.conv10, name='conv11', ksize=1, stride=1, out_channels=64, patch_size=1, norm_type=norm_type)
-            self.conv12, _ = ConvLayer(self.conv11, name='conv12', ksize=1, stride=1, out_channels=NUM_TEMPLATES, patch_size=1, norm_type=norm_type, layer_type='Softmax')
+            self.conv6, _ = ConvLayer(self.encoder.pool3, name='conv6', ksize=1, stride=1, out_channels=4096, patch_size=1, norm_type=norm_type, trainable=trainable)
+            self.conv7, _ = ConvLayer(self.conv6, name='conv7', ksize=1, stride=1, out_channels=1024, patch_size=1, norm_type=norm_type, trainable=trainable)
+            self.conv8, _ = ConvLayer(self.conv7, name='conv8', ksize=1, stride=1, out_channels=512, patch_size=1, norm_type=norm_type, trainable=trainable)
+            self.conv9, _ = ConvLayer(self.conv8, name='conv9', ksize=1, stride=1, out_channels=256, patch_size=1, norm_type=norm_type, trainable=trainable)
+            self.conv10, _ = ConvLayer(self.conv9, name='conv10', ksize=1, stride=1, out_channels=128, patch_size=1, norm_type=norm_type, trainable=trainable)
+            self.conv11, _ = ConvLayer(self.conv10, name='conv11', ksize=1, stride=1, out_channels=64, patch_size=1, norm_type=norm_type, trainable=trainable)
+            self.conv12, _ = ConvLayer(self.conv11, name='conv12', ksize=1, stride=1, out_channels=NUM_TEMPLATES, patch_size=1, norm_type=norm_type, trainable=trainable, layer_type='Softmax')
 
         # ################Other Inputs#############################################################################
         self.temp = tf.placeholder(tf.float32, shape=[])
@@ -125,7 +126,7 @@ class ASCIINet:
 
 
     def build_summaries(self):
-        tf.summary.image('target', self.gray_im, max_outputs=6)
+        tf.summary.image('target', self.non_blurred, max_outputs=6)
         tf.summary.image('output', self.view_output, max_outputs=6)
         tf.summary.image('downsampled_in', self.im1)
         tf.summary.image('downsampled_out', self.im2)

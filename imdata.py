@@ -26,6 +26,8 @@ val_data_dir = const.val_data_dir
 char_array = const.char_array
 char_dict = const.char_dict
 train_set_size = const.train_set_size
+coco_dir = const.coco_dir
+
 
 
 def load_data(num_batches=100,
@@ -75,16 +77,22 @@ def load_data_gen(num_batches=100,
                   img_rows=224,
                   img_cols=224):
     ind = 0
+    n = 0
 
+    directory = os.listdir(coco_dir)
     while True:
         x = np.zeros((batch_size, img_rows, img_cols, 3), dtype='uint8')
 
-
-        for i in itertools.count(ind,1):
+        for i in itertools.count(ind, 1):
             if ind == 12000:
                 ind = 0
+                n = 0
                 break
-            imgpath = img_data_dir + 'in_' + str(i) + '.jpg'
+            # imgpath = img_data_dir + 'in_' + str(i) + '.jpg'
+            # imgpath = coco_dir + 'COCO_train2014' + str(i) + '.jpg'
+            imgpath = coco_dir + directory[n]
+            n += 1
+
             img = Image.open(imgpath)
             x[ind-i] = np.asarray(img, dtype='uint8')
             if i == ind + 6:
@@ -98,7 +106,26 @@ def load_data_gen(num_batches=100,
 
 
 
+def load_val_data_gen(num_batches=100,
+                      batch_size=6,
+                      img_rows=224,
+                      img_cols=224):
 
+    ind = 15000
+
+    while True:
+        x = np.zeros((batch_size, img_rows, img_cols, 3), dtype='uint8')
+
+        for i in itertools.count(ind, 1):
+            if ind == 15006:
+                ind = 15000
+                break
+            imgpath = img_data_dir + 'in_' + str(i) + '.jpg'
+            img = Image.open(imgpath)
+            x[i % batch_size] = np.asarray(img, dtype='uint8')
+            if i == ind + batch_size:
+                ind += batch_size
+                yield x
 
 
 
@@ -201,10 +228,47 @@ def make_template_ims(path='./assets/temp_pics/',temp_size=8):
         # break
     # out.show()
 
+def make_face_templates(path='./assets/rgb_in/img_celeba/'):
+    for i in range(62):
+        n = np.random.randint(0,202598)
+        imgpath = path + 'in_' + str(n) + '.jpg'
+        im = np.asarray(Image.open(imgpath).resize((8, 8)))
+        out = Image.fromarray(im.astype('uint8'))
+        out.save('./assets/face_templates/' + str(i), 'JPEG')
+
+
+
+def check_coco():
+    for im in os.listdir('/home/nsaftarl/ASCIIArtNN/assets/coco-set/train2014/'):
+        # print(Image.open(im).size)
+        print(np.asarray(Image.open('/home/nsaftarl/ASCIIArtNN/assets/coco-set/train2014/' + im)).shape)
+
+def clean_coco():
+    path = '/home/nsaftarl/ASCIIArtNN/assets/coco-set/train2014/'
+    for im in os.listdir(path):
+        # print(len(np.asarray(Image.open(path + im)).shape))
+        if len(np.asarray(Image.open(path + im)).shape) != 3:
+            os.remove(path + im)
+
+
+def resize_coco():
+    in_path = '/home/nsaftarl/ASCIIArtNN/assets/coco-set/train2014/'
+    out_path = '/home/nsaftarl/ASCIIArtNN/assets/coco-resized/'
+
+    if not os.path.exists(out_path):
+        os.makedirs(out_path)
+
+    for im in os.listdir('/home/nsaftarl/ASCIIArtNN/assets/coco-set/train2014/'):
+        img = np.asarray(Image.open(in_path + im).resize((224, 224)), dtype='uint8')
+        img = Image.fromarray(img)
+        img.save(out_path + im)
+
 
 
 
 if __name__ == '__main__':
     # create_char_img()
     # overlay_img()
-    make_template_ims()
+    # make_template_ims()
+    # make_face_templates()
+    resize_coco()
