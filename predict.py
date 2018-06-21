@@ -43,7 +43,7 @@ char_array = np.asarray(['M','N','H','Q', '$', 'O','C', '?','7','>','!',':','-',
 char_dict = {'M':0,'N':1,'H':2,'Q':3,'$':4,'O':5,'C':6,'?':7,'7':8,'>':9,'!':10,':':11,'-':12,';':13,'.':14,' ':15}
 
 
-base_model = models.load_model('./experiments/2018-02-15.23:18:15/weights.9.hdf5', custom_objects={'loss':loss})
+# base_model = models.load_model('./experiments/2018-02-15.23:18:15/weights.9.hdf5', custom_objects={'loss':loss})
 # base_model.summary()
 
 #Predicts ascii output of a given image
@@ -60,33 +60,16 @@ def main(directory='here', img_name='a.png'):
 	new_height = 0
 	new_width = 0
 
-	# if img.size[0] % 32 != 0 and img.size[1] % 32 != 0:
-	# 	for i,num in enumerate(const.img_sizes):
-	# 		if i == 0:
-	# 			continue
-	# 		else:
-	# 			if img.size[0] < num:
-	# 				new_width = const.img_sizes[i-1]
-	# 			if img.size[1] < num:
-	# 				new_height = const.img_sizes[i-1]
-
-	# if new_height is not 0 and new_width is not 0:
-	# 	img = img.resize((new_width,new_height))
 	img=img.resize((1024,1024))
 
 
 	x = image.img_to_array(img)
 	x = np.expand_dims(x, axis=0)
-	print(x.shape)
 
-	# get_output = K.function([base_model.layers[0].input], [base_model.layers[3].output])
-	# layer_output = get_output([x])[0]
-	# print(layer_output.shape)
 	n = base_model.predict(x)
 	print(n.shape)
 	maxes = np.argmax(n,axis=3)
-	# print(maxes)
-	# print(maxes.shape)
+
 
 	buff = ''
 
