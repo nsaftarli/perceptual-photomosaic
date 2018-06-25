@@ -27,7 +27,7 @@ snapshots/
 #Data
 *.jpg
 *.png
-
+*.mov
 #Test files
 tst.py
 

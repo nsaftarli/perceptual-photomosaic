@@ -13,6 +13,7 @@ from tfoptimizer import *
 from layers import LossLayer
 from utils import *
 import scipy.misc as misc
+from predictTop import *
 
 
 '''Data constants'''
@@ -29,6 +30,9 @@ text_cols = const.text_cols
 dims = const.char_count
 experiments_dir = const.experiments_dir
 coco_dir = const.coco_dir
+img_size = const.img_size
+patch_size = const.patch_size
+num_patches = const.num_patches
 
 
 
@@ -42,15 +46,14 @@ argParser.add_argument('-i', '--iterations', dest='iterations', action='store', 
 argParser.add_argument('-u', '--update', dest='update', action='store', default=100, type=int)
 argParser.add_argument('-lr', '--learning-rate',  dest='lr', action='store', default=1e-6, type=float)
 argParser.add_argument('-db', '--debug', dest='debug', action='store', default=False, type=bool)
-argParser.add_argument('-t', '--temp', dest='temp',  action='store',  default=1.0,  type=float)
+argParser.add_argument('-t', '--temperature', dest='temp',  action='store',  default=1.0,  type=float)
 argParser.add_argument('-n', '--notes', dest='notes', action='store', default=None, type=str)
 argParser.add_argument('-d', '--dataset', dest='dset', action='store', default='Faces', type=str)
+argParser.add_argument('-rgb', '--colour', dest='rgb', action='store', default=False, type=bool)
+argParser.add_argument('-tmp', '--templates', dest='tmp', action='store', default='other', type=str)
+argParser.add_argument('-v', '--video', dest='vid', action='store', default=False, type=bool)
 cmdArgs = argParser.parse_args()
 ##################################################
-
-
-
-
 
 ####Settings######################################
 gpu = cmdArgs.gpu
@@ -61,6 +64,10 @@ debug = cmdArgs.debug
 t = cmdArgs.temp
 notes = cmdArgs.notes
 dset = cmdArgs.dset
+rgb = cmdArgs.rgb
+tmp = cmdArgs.tmp
+vid = cmdArgs.vid
+NUM_TEMPLATES = 62
 
 
 #####File Handling###############################
@@ -98,15 +105,18 @@ sess = tf.Session(config=config)
 
 
 ############Data Input######################
-dataset = tf.data.Dataset.from_generator(imdata.load_data_gen,  (tf.float32,tf.int32))
+if not vid:
+    dataset = tf.data.Dataset.from_generator(imdata.load_data_gen,  (tf.float32, tf.int32))
+else:
+    dataset = tf.data.Dataset.from_generator(imdata.load_vid_data_gen, (tf.float32, tf.int32))
 next_batch = dataset.make_one_shot_iterator().get_next()
+
+if tmp == 'ascii':
+    y = imdata.get_templates(path='./assets/char_set_alt/', num_temps=NUM_TEMPLATES)
+else:
+    y = imdata.get_templates(path='./assets/cam_templates/', num_temps=NUM_TEMPLATES)
+
 #########################################
-
-
-y = imdata.get_templates(path='./assets/char_set_alt/', num_chars=62)
-# y = imdata.get_templates(path='./assets/cam_templates/', num_chars=62)
-
-
 
 
 ############Pebbles Test#####################
@@ -119,11 +129,12 @@ y = imdata.get_templates(path='./assets/char_set_alt/', num_chars=62)
 
 ##############Build Graph###################
 with tf.device('/gpu:'+str(0)):
-    input = tf.placeholder(tf.float32, shape=(6, 224, 224, 3))
-    # input = tf.image.resize_images(input,size=[224,224])
-    m = ASCIINet(images=input, templates=y)
+    input = tf.placeholder(tf.float32, shape=(6, img_size, img_size, 3))
+    m = ASCIINet(images=input, templates=y, rgb=rgb)
     tLoss = m.tLoss
-    opt,  lr = optimize(tLoss)
+    opt, lr = optimize(tLoss)
+    argmax = tf.one_hot(tf.argmax(m.softmax, axis=-1), depth=62)
+    o = predictTop(argmax, m.temps, batch_size=6, rgb=rgb, num_temps=62, img_size=img_size)
 merged = tf.summary.merge_all()
 ############################################
 
@@ -138,47 +149,57 @@ with sess:
     writer = tf.summary.FileWriter(log_dir, sess.graph)
 
     for i in range(iterations):
+        ###############Temperature Schedule####################
+        if i > 1 and i % 1000 == 0:
+            if i < 8000:
+                t *= 2
+        #######################################################
+
+        ###############Forward Pass############################
+
         x, ind = sess.run(next_batch)
-        # print(x.shape)
-        feed_dict = {input: x,
-                     lr: lrate,
-                     m.temp: t}
+
+
+        feed_dict = {
+                        input: x,
+                        lr: lrate,
+                        m.temp: t
+                     }
 
         summary, result, totalLoss = sess.run([merged,  opt,  tLoss],
                                               feed_dict=feed_dict)
+        ##########################################################
 
-
+        ################Saving/Logging############################
         if i % update == 0:
+            print('Template Set: ', tmp)
+            print('Colour: ', rgb)
             print('Iteration #:', str(i))
             print('temperature: ' + str(t))
             print('Learning Rate:', str(lrate))
             print('Loss:', str(totalLoss))
             print('Index:', ind)
+            print(':::::::::Softmax Max Values::::::::::::')
+            print(sess.run(tf.reduce_max(m.softmax[0, 0, 0, :]),  feed_dict={input: x, m.temp: t}))
+            print('Experiment directory: ', experiments_dir)
+            print('Save directory: ', snapshot_dir)
+            print('Log directory: ', log_dir)
 
-
-
-            values = sess.run(m.softmax[0,  17, :, :],  feed_dict={input: x,m.temp: t})
-
-
-            print(':::::::::Softmax Values::::::::::::')
-            print(sess.run(m.softmax[0, 0, 0, :],  feed_dict={input: x, m.temp: t}))
-
-            #################Saving/Logging###################
-            for j in range(28):
-                log_histogram(writer,  'coeff' + str(j),  values[j, :], i)
+            values = sess.run(m.softmax[0,  17, :, :],  feed_dict={input: x, m.temp: t})
+            for j in range(64):
+                log_histogram(writer,  'coeff' + str(j),  values[j, :], i, bins=NUM_TEMPLATES)
             writer.add_summary(summary, i+1)
             chkpt.save(sess, snapshot_dir + 'checkpoint.chkpt')
-            misc.imsave(im_dir + str(i) + '.jpg', sess.run(m.view_output[0], feed_dict={input: x, m.temp: t}))
-            ##################################################
+            misc.imsave(im_dir + str(i) + 'i.jpg', sess.run(m.input[1], feed_dict={input: x, m.temp: t}))
+            misc.imsave(im_dir + str(i) + 's.jpg', sess.run(m.view_output[1], feed_dict={input: x, m.temp: t}))
+            misc.imsave(im_dir + str(i) + 'o.jpg', sess.run(o[0], feed_dict={input: x, m.temp: t}))
+            # misc.imsave(im_dir + str(i) + 'o.jpg', sess.run(o[1], feed_dict={input: x, m.temp: t}))
+            # misc.imsave(im_dir + str(i) + 'o.jpg', sess.run(o[2], feed_dict={input: x, m.temp: t}))
+            # misc.imsave(im_dir + str(i) + 'o.jpg', sess.run(o[3], feed_dict={input: x, m.temp: t}))
+            # misc.imsave(im_dir + str(i) + 'o.jpg', sess.run(o[4], feed_dict={input: x, m.temp: t}))
+            # misc.imsave(im_dir + str(i) + 'o.jpg', sess.run(o[5], feed_dict={input: x, m.temp: t}))
+        ##############################################################
 
             if debug:
                 print("Input Range:", sess.run(m.gray_im[0, 3:7, 3:7, :]))
                 print("Output Range:", sess.run(m.reshaped_output[0, 3:7, 3:7, :],  feed_dict={m.temp: t}))
-
-
-        ###############Temperature Schedule####################
-        if i > 1 and i % 1000 == 0:
-            if i < 10000:
-                t *= 2
-        #######################################################
-#######################################################

@@ -4,7 +4,7 @@ import numpy as np
 
 def log_histogram(writer, tag, values, step, bins=62):
     values = np.array(values)
-    bin_edges = np.linspace(0, 61, num=bins)
+    bin_edges = np.linspace(0, bins-1, num=bins)
 
     hist = tf.HistogramProto()
     hist.min = float(0)

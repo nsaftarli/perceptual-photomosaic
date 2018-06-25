@@ -4,7 +4,7 @@ from Normalization import *
 from Regularizers import *
 
 
-def ConvLayer(x, name, ksize=3, stride=1, layer_type='Decoder', out_channels=None, trainable=True, patch_size=None, norm_type=None):
+def ConvLayer(x, name, ksize=3, stride=1, layer_type='Decoder', out_channels=None, trainable=True, norm_type=None):
 
     in_channels = x.get_shape()[3].value
     shape_in = [ksize, ksize, in_channels, out_channels]
