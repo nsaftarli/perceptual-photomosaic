@@ -147,7 +147,7 @@ lrate = base_lr
 with sess:
     sess.run(tf.global_variables_initializer())
     writer = tf.summary.FileWriter(log_dir, sess.graph)
-
+    n = 0
     for i in range(iterations):
         ###############Temperature Schedule####################
         if i > 1 and i % 1000 == 0:
@@ -190,9 +190,20 @@ with sess:
                 log_histogram(writer,  'coeff' + str(j),  values[j, :], i, bins=NUM_TEMPLATES)
             writer.add_summary(summary, i+1)
             chkpt.save(sess, snapshot_dir + 'checkpoint.chkpt')
-            misc.imsave(im_dir + str(i) + 'i.jpg', sess.run(m.input[1], feed_dict={input: x, m.temp: t}))
-            misc.imsave(im_dir + str(i) + 's.jpg', sess.run(m.view_output[1], feed_dict={input: x, m.temp: t}))
-            misc.imsave(im_dir + str(i) + 'o.jpg', sess.run(o[0], feed_dict={input: x, m.temp: t}))
+            # misc.imsave(im_dir + str(i) + 'i.jpg', sess.run(m.input[1], feed_dict={input: x, m.temp: t}))
+            # misc.imsave(im_dir + str(i) + 's.jpg', sess.run(m.view_output[1], feed_dict={input: x, m.temp: t}))
+            misc.imsave(im_dir + str(n) + 'o.jpg', sess.run(o[0], feed_dict={input: x, m.temp: t}))
+            n += 1
+            misc.imsave(im_dir + str(n) + 'o.jpg', sess.run(o[1], feed_dict={input: x, m.temp: t}))
+            n += 1
+            misc.imsave(im_dir + str(n) + 'o.jpg', sess.run(o[2], feed_dict={input: x, m.temp: t}))
+            n += 1
+            misc.imsave(im_dir + str(n) + 'o.jpg', sess.run(o[3], feed_dict={input: x, m.temp: t}))
+            n += 1
+            misc.imsave(im_dir + str(n) + 'o.jpg', sess.run(o[4], feed_dict={input: x, m.temp: t}))
+            n += 1
+            misc.imsave(im_dir + str(n) + 'o.jpg', sess.run(o[5], feed_dict={input: x, m.temp: t}))
+            n += 1
             # misc.imsave(im_dir + str(i) + 'o.jpg', sess.run(o[1], feed_dict={input: x, m.temp: t}))
             # misc.imsave(im_dir + str(i) + 'o.jpg', sess.run(o[2], feed_dict={input: x, m.temp: t}))
             # misc.imsave(im_dir + str(i) + 'o.jpg', sess.run(o[3], feed_dict={input: x, m.temp: t}))

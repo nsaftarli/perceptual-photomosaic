@@ -157,8 +157,6 @@ with sess:
                 misc.imsave(im_dir + str(n) + '.jpg', sess.run(side_by_side[5], feed_dict={input: x, m.temp: t}))
                 n += 1
             else:
-                misc.imsave(im_dir + str(n) + '.jpg', sess.run(o[0], feed_dict={input: x, m.temp: t}))
-                n += 1
                 misc.imsave(im_dir + str(n) + '.jpg', sess.run(o[1], feed_dict={input: x, m.temp: t}))
                 n += 1
                 misc.imsave(im_dir + str(n) + '.jpg', sess.run(o[2], feed_dict={input: x, m.temp: t}))
@@ -168,6 +166,8 @@ with sess:
                 misc.imsave(im_dir + str(n) + '.jpg', sess.run(o[4], feed_dict={input: x, m.temp: t}))
                 n += 1
                 misc.imsave(im_dir + str(n) + '.jpg', sess.run(o[5], feed_dict={input: x, m.temp: t}))
+                n += 1
+                misc.imsave(im_dir + str(n) + '.jpg', sess.run(o[0], feed_dict={input: x, m.temp: t}))
                 n += 1
             writer.add_summary(summary, i+1)
     print("Model restored")

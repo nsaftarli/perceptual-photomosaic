@@ -131,22 +131,58 @@ def load_vid_data_gen(num_batches=100,
                       batch_size=6,
                       img_rows=512,
                       img_cols=512):
+
     ind = 0
     n = 0
+
     directory = os.listdir(video_dir)
     while True:
         x = np.zeros((batch_size, img_rows, img_cols, 3), dtype='uint8')
 
+        # for i in itertools.count(ind, 1):
+        #     if ind == 700:
+        #         ind = 0
+        #         n = 0
+        #         break
+        #     imgpath = video_dir + str() + 
+
+
         for i in itertools.count(ind, 1):
-            if n == 366:
-                n = 0
-            # imgpath = video_dir + directory[n]
-            imgpath = video_dir + str(n+1) + '.jpg'
-            n += 1
+            if i == 700:
+                ind = 0
+                break
+            # imgpath = img_data_dir + 'in_' + str(i) + '.jpg'
+            # imgpath = coco_dir + 'COCO_train2014' + str(i) + '.jpg'
+            # imgpath = coco_dir + directory[n]
+            imgpath = video_dir + str(i+1) + '.jpg'
+            print(imgpath)
+
+
             img = Image.open(imgpath)
-            x[n % batch_size] = np.asarray(img, dtype='uint8')
-            if n != 0 and n % (batch_size + 1) == 0:
-                yield x, n
+            x[i % batch_size] = np.asarray(img, dtype='uint8')
+            if i == ind + batch_size:
+                ind += batch_size
+                yield x,i+1
+
+
+
+    # ind = 0
+    # n = 0
+    # directory = os.listdir(video_dir)
+    # while True:
+    #     x = np.zeros((batch_size, img_rows, img_cols, 3), dtype='uint8')
+
+    #     for i in itertools.count(ind, 1):
+    #         if n == 700:
+    #             n = 0
+    #         # imgpath = video_dir + directory[n]
+    #         imgpath = video_dir + str(n+1) + '.jpg'
+    #         img = Image.open(imgpath)
+    #         x[n % batch_size] = np.asarray(img, dtype='uint8')
+    #         if n != 0 and n % (batch_size + 1) == 0:
+    #             yield x, n
+    #         n += 1
+
 
 
 
@@ -310,8 +346,8 @@ def resize_coco():
 
 
 def resize_movie():
-    in_path = '/home/nsaftarl/ASCIIArtNN/assets/movie/'
-    out_path = '/home/nsaftarl/ASCIIArtNN/assets/movie-resized-512/'
+    in_path = '/home/nsaftarl/ASCIIArtNN/assets/mv/'
+    out_path = '/home/nsaftarl/ASCIIArtNN/assets/mv-resized-512/'
 
     if not os.path.exists(out_path):
         os.makedirs(out_path)
@@ -329,4 +365,5 @@ if __name__ == '__main__':
     # turn_im_into_templates()
     # make_face_templates()
     # resize_coco()
-    resize_movie()
+    # resize_movie()
+    load_vid_data_gen()

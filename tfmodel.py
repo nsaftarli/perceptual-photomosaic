@@ -184,7 +184,7 @@ class ASCIINet:
         self.f_loss4 = tf.losses.mean_squared_error(self.encoder.conv4_1, self.vgg2.conv4_1)
         self.f_loss5 = tf.losses.mean_squared_error(self.encoder.conv5_1, self.vgg2.conv5_1)
 
-        self.n_loss = tf.losses.mean_squared_error(self.input, self.noisy_img)
+        self.n_loss = 1e6 * tf.losses.mean_squared_error(self.input, self.noisy_img)
         # self.blur_loss = tf.losses.mean_squared_error(self.vgg4.conv1_1, self.vgg5.conv1_1) + \
         #     tf.losses.mean_squared_error(self.vgg6.conv1_1, self.vgg7.conv1_1)
 
