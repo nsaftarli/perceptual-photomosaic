@@ -27,6 +27,7 @@ char_array = const.char_array
 char_dict = const.char_dict
 train_set_size = const.train_set_size
 coco_dir = const.coco_dir
+video_dir = const.video_dir
 
 
 
@@ -70,12 +71,13 @@ def load_data(num_batches=100,
         if test:
             break
 
-        yield (x,i)
+        yield (x, i)
+
 
 def load_data_gen(num_batches=100,
                   batch_size=6,
-                  img_rows=224,
-                  img_cols=224):
+                  img_rows=512,
+                  img_cols=512):
     ind = 0
     n = 0
 
@@ -94,43 +96,98 @@ def load_data_gen(num_batches=100,
             n += 1
 
             img = Image.open(imgpath)
-            x[ind-i] = np.asarray(img, dtype='uint8')
-            if i == ind + 6:
-                ind += 6
-                yield x,i
-
-# def load_val_data_gen(num_batches=100,
-#                       batch_size=6,
-#                       img_rows=224,
-#                       img_cols=224):
-
+            x[i % batch_size] = np.asarray(img, dtype='uint8')
+            if i == ind + batch_size:
+                ind += batch_size
+                yield x, i
 
 
 def load_val_data_gen(num_batches=100,
                       batch_size=6,
-                      img_rows=224,
-                      img_cols=224):
+                      img_rows=512,
+                      img_cols=512):
 
     ind = 15000
 
+    n = 0
+    directory = os.listdir(coco_dir)
     while True:
         x = np.zeros((batch_size, img_rows, img_cols, 3), dtype='uint8')
 
         for i in itertools.count(ind, 1):
-            if ind == 15006:
+            if ind == 15060:
                 ind = 15000
                 break
-            imgpath = img_data_dir + 'in_' + str(i) + '.jpg'
+            # imgpath = img_data_dir + 'in_' + str(i) + '.jpg'
+            imgpath = coco_dir + directory[n]
+            n += 1
             img = Image.open(imgpath)
             x[i % batch_size] = np.asarray(img, dtype='uint8')
             if i == ind + batch_size:
                 ind += batch_size
                 yield x
 
+def load_vid_data_gen(num_batches=100,
+                      batch_size=6,
+                      img_rows=512,
+                      img_cols=512):
+
+    ind = 0
+    n = 0
+
+    directory = os.listdir(video_dir)
+    while True:
+        x = np.zeros((batch_size, img_rows, img_cols, 3), dtype='uint8')
+
+        # for i in itertools.count(ind, 1):
+        #     if ind == 700:
+        #         ind = 0
+        #         n = 0
+        #         break
+        #     imgpath = video_dir + str() + 
+
+
+        for i in itertools.count(ind, 1):
+            if i == 700:
+                ind = 0
+                break
+            # imgpath = img_data_dir + 'in_' + str(i) + '.jpg'
+            # imgpath = coco_dir + 'COCO_train2014' + str(i) + '.jpg'
+            # imgpath = coco_dir + directory[n]
+            imgpath = video_dir + str(i+1) + '.jpg'
+            print(imgpath)
+
+
+            img = Image.open(imgpath)
+            x[i % batch_size] = np.asarray(img, dtype='uint8')
+            if i == ind + batch_size:
+                ind += batch_size
+                yield x,i+1
 
 
 
-def load_data_static(num=10000, img_rows=224, img_cols=224):
+    # ind = 0
+    # n = 0
+    # directory = os.listdir(video_dir)
+    # while True:
+    #     x = np.zeros((batch_size, img_rows, img_cols, 3), dtype='uint8')
+
+    #     for i in itertools.count(ind, 1):
+    #         if n == 700:
+    #             n = 0
+    #         # imgpath = video_dir + directory[n]
+    #         imgpath = video_dir + str(n+1) + '.jpg'
+    #         img = Image.open(imgpath)
+    #         x[n % batch_size] = np.asarray(img, dtype='uint8')
+    #         if n != 0 and n % (batch_size + 1) == 0:
+    #             yield x, n
+    #         n += 1
+
+
+
+
+
+def load_data_static(num=10000, img_rows=512, img_cols=512):
         x = np.zeros((num, img_rows, img_cols, 3), dtype='uint8')
 
         for i in range(num):
@@ -141,17 +198,31 @@ def load_data_static(num=10000, img_rows=224, img_cols=224):
         return x
 
 
-def get_templates(path='./assets/char_set/', num_chars=16):
-    images = np.zeros((1, 8, 8, num_chars))
+def get_templates(path='./assets/char_set/', num_temps=16, rgb=True):
 
-    for j in range(num_chars):
-        # im = Image.open(path + str(j) + '.png').convert('L')
-        # images[0,:,:,j] = np.asarray(im,dtype='uint8')
-        im = Image.open(path + str(j) + '.png')
-        im = np.asarray(im, dtype='uint8')
-        images[0, :, :, j] = np.mean(im, axis=-1)
-    # return tf.convert_to_tensor(images,tf.float32)
-    return images
+    if not rgb:
+        images = np.zeros((1, 8, 8, num_temps))
+        for j in range(num_temps):
+            im = Image.open(path + str(j) + '.png')
+            im = np.asarray(im, dtype='uint8')
+            images[0, :, :, j] = np.mean(im, axis=-1)
+    else:
+        images = np.zeros((1, 8, 8, 3, num_temps))
+        for j in range(num_temps):
+            im = Image.open(path + str(j) + '.png')
+            im = np.asarray(im, dtype='uint8')
+            images[0, :, :, :, j] = im
+    return images 
+
+    # for j in range(num_temps):
+    #     # im = Image.open(path + str(j) + '.png').convert('L')
+    #     # images[0,:,:,j] = np.asarray(im,dtype='uint8')
+    #     im = Image.open(path + str(j) + '.png')
+    #     im = np.asarray(im, dtype='uint8')
+    #     # images[0, :, :, j] = np.mean(im, axis=-1)
+    #     images[0, :, :, :, j] = im
+    # # return tf.convert_to_tensor(images,tf.float32)
+    # return images
 
 
 def get_pebbles(path='./pebbles.jpg'):
@@ -198,9 +269,9 @@ def overlay_img(path='./'):
 
 
 def make_template_ims(path='./assets/temp_pics/',temp_size=8):
-    imgpath = path + 'IMG_1359.JPG'
+    imgpath = path + 'starry-night-van-gogh.jpg'
     # print(Image.)
-    im = np.asarray(Image.open(imgpath).resize((272, 204)))
+    im = np.asarray(Image.open(imgpath).resize((287, 224)))
     template = np.zeros((8, 8, 3))
     print(im.shape)
     h = im.shape[0]
@@ -227,6 +298,16 @@ def make_template_ims(path='./assets/temp_pics/',temp_size=8):
 
         # break
     # out.show()
+def turn_im_into_templates(path='./assets/temp_pics/', temp_size=8):
+    imgpath = path + 'picasso-femmes-d-alger.jpg'
+    im = np.asarray(Image.open(imgpath).resize((288, 224)))
+    x = 0
+    for i in range(im.shape[0] // temp_size):
+        for j in range(im.shape[1] // temp_size):
+            window = im[i*temp_size:i*temp_size+temp_size, j*temp_size:j*temp_size+temp_size, :]
+            out = Image.fromarray(window.astype('uint8'))
+            out.save('./assets/cam_templates_2/' + str(x) + '.png', 'PNG')
+            x += 1
 
 def make_face_templates(path='./assets/rgb_in/img_celeba/'):
     for i in range(62):
@@ -253,22 +334,36 @@ def clean_coco():
 
 def resize_coco():
     in_path = '/home/nsaftarl/ASCIIArtNN/assets/coco-set/train2014/'
-    out_path = '/home/nsaftarl/ASCIIArtNN/assets/coco-resized/'
+    out_path = '/home/nsaftarl/ASCIIArtNN/assets/coco-resized-512/'
 
     if not os.path.exists(out_path):
         os.makedirs(out_path)
 
     for im in os.listdir('/home/nsaftarl/ASCIIArtNN/assets/coco-set/train2014/'):
-        img = np.asarray(Image.open(in_path + im).resize((224, 224)), dtype='uint8')
+        img = np.asarray(Image.open(in_path + im).resize((512, 512), resample=Image.BILINEAR), dtype='uint8')
         img = Image.fromarray(img)
         img.save(out_path + im)
 
 
+def resize_movie():
+    in_path = '/home/nsaftarl/ASCIIArtNN/assets/mv/'
+    out_path = '/home/nsaftarl/ASCIIArtNN/assets/mv-resized-512/'
 
+    if not os.path.exists(out_path):
+        os.makedirs(out_path)
+
+    for im in os.listdir(video_dir):
+        print(im)
+        img = np.asarray(Image.open(in_path + im).resize((512, 512), resample=Image.BILINEAR), dtype='uint8')
+        img = Image.fromarray(img)
+        img.save(out_path + im)
 
 if __name__ == '__main__':
     # create_char_img()
     # overlay_img()
     # make_template_ims()
+    # turn_im_into_templates()
     # make_face_templates()
-    resize_coco()
+    # resize_coco()
+    # resize_movie()
+    load_vid_data_gen()
