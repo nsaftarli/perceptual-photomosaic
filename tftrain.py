@@ -106,7 +106,7 @@ sess = tf.Session(config=config)
 
 ############Data Input######################
 if not vid:
-    dataset = tf.data.Dataset.from_generator(imdata.load_data_gen,  (tf.float32, tf.int32))
+    dataset = tf.data.Dataset.from_generator(imdata.load_data_gen,  (tf.float32, tf.int32)).prefetch(12)
 else:
     dataset = tf.data.Dataset.from_generator(imdata.load_vid_data_gen, (tf.float32, tf.int32))
 next_batch = dataset.make_one_shot_iterator().get_next()
@@ -143,6 +143,7 @@ merged = tf.summary.merge_all()
 ############Training################################
 chkpt = tf.train.Saver()
 lrate = base_lr
+print('Num Variables: ', np.sum([np.product([xi.value for xi in x.get_shape()]) for x in tf.all_variables()]))
 
 with sess:
     sess.run(tf.global_variables_initializer())
@@ -185,25 +186,15 @@ with sess:
             print('Save directory: ', snapshot_dir)
             print('Log directory: ', log_dir)
 
+
             values = sess.run(m.softmax[0,  17, :, :],  feed_dict={input: x, m.temp: t})
             for j in range(64):
                 log_histogram(writer,  'coeff' + str(j),  values[j, :], i, bins=NUM_TEMPLATES)
             writer.add_summary(summary, i+1)
             chkpt.save(sess, snapshot_dir + 'checkpoint.chkpt')
-            # misc.imsave(im_dir + str(i) + 'i.jpg', sess.run(m.input[1], feed_dict={input: x, m.temp: t}))
-            # misc.imsave(im_dir + str(i) + 's.jpg', sess.run(m.view_output[1], feed_dict={input: x, m.temp: t}))
-            misc.imsave(im_dir + str(n) + 'o.jpg', sess.run(o[0], feed_dict={input: x, m.temp: t}))
-            n += 1
-            misc.imsave(im_dir + str(n) + 'o.jpg', sess.run(o[1], feed_dict={input: x, m.temp: t}))
-            n += 1
-            misc.imsave(im_dir + str(n) + 'o.jpg', sess.run(o[2], feed_dict={input: x, m.temp: t}))
-            n += 1
-            misc.imsave(im_dir + str(n) + 'o.jpg', sess.run(o[3], feed_dict={input: x, m.temp: t}))
-            n += 1
-            misc.imsave(im_dir + str(n) + 'o.jpg', sess.run(o[4], feed_dict={input: x, m.temp: t}))
-            n += 1
-            misc.imsave(im_dir + str(n) + 'o.jpg', sess.run(o[5], feed_dict={input: x, m.temp: t}))
-            n += 1
+            misc.imsave(im_dir + str(i) + 'i.jpg', sess.run(m.input[1], feed_dict={input: x, m.temp: t}))
+            misc.imsave(im_dir + str(i) + 's.jpg', sess.run(m.view_output[1], feed_dict={input: x, m.temp: t}))
+            misc.imsave(im_dir + str(i) + 'o.jpg', sess.run(o[1], feed_dict={input: x, m.temp: t}))
             # misc.imsave(im_dir + str(i) + 'o.jpg', sess.run(o[1], feed_dict={input: x, m.temp: t}))
             # misc.imsave(im_dir + str(i) + 'o.jpg', sess.run(o[2], feed_dict={input: x, m.temp: t}))
             # misc.imsave(im_dir + str(i) + 'o.jpg', sess.run(o[3], feed_dict={input: x, m.temp: t}))

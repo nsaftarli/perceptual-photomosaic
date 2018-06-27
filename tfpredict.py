@@ -98,9 +98,9 @@ sess = tf.Session(config=config)
 
 ############Data Input######################
 if val:
-    dataset = tf.data.Dataset.from_generator(imdata.load_val_data_gen,  (tf.float32))
+    dataset = tf.data.Dataset.from_generator(imdata.load_val_data_gen,  (tf.float32)).prefetch(48)
 elif video:
-    dataset = tf.data.Dataset.from_generator(imdata.load_vid_data_gen, (tf.float32, tf.int32))
+    dataset = tf.data.Dataset.from_generator(imdata.load_vid_data_gen, (tf.float32, tf.int32)).prefetch(48)
 dataset = tf.data.Dataset.from_generator(imdata.load_vid_data_gen, (tf.float32, tf.int32))
 
 next_batch = dataset.make_one_shot_iterator().get_next()
@@ -138,36 +138,19 @@ with sess:
         # print(x[1])
         feed_dict = {input: x,  m.temp: t}
 
-        summary,  totalLoss = sess.run([merged, tLoss],
-                                       feed_dict=feed_dict)
+        summary = sess.run([merged, tLoss], feed_dict=feed_dict)
 
         if i % update == 0:
-            print(totalLoss)
-            if not video:
-                misc.imsave(im_dir + str(n) + '.jpg', sess.run(side_by_side[0], feed_dict={input: x, m.temp: t}))
-                n += 1
-                misc.imsave(im_dir + str(n) + '.jpg', sess.run(side_by_side[1], feed_dict={input: x, m.temp: t}))
-                n += 1
-                misc.imsave(im_dir + str(n) + '.jpg', sess.run(side_by_side[2], feed_dict={input: x, m.temp: t}))
-                n += 1
-                misc.imsave(im_dir + str(n) + '.jpg', sess.run(side_by_side[3], feed_dict={input: x, m.temp: t}))
-                n += 1
-                misc.imsave(im_dir + str(n) + '.jpg', sess.run(side_by_side[4], feed_dict={input: x, m.temp: t}))
-                n += 1
-                misc.imsave(im_dir + str(n) + '.jpg', sess.run(side_by_side[5], feed_dict={input: x, m.temp: t}))
-                n += 1
-            else:
-                misc.imsave(im_dir + str(n) + '.jpg', sess.run(o[1], feed_dict={input: x, m.temp: t}))
-                n += 1
-                misc.imsave(im_dir + str(n) + '.jpg', sess.run(o[2], feed_dict={input: x, m.temp: t}))
-                n += 1
-                misc.imsave(im_dir + str(n) + '.jpg', sess.run(o[3], feed_dict={input: x, m.temp: t}))
-                n += 1
-                misc.imsave(im_dir + str(n) + '.jpg', sess.run(o[4], feed_dict={input: x, m.temp: t}))
-                n += 1
-                misc.imsave(im_dir + str(n) + '.jpg', sess.run(o[5], feed_dict={input: x, m.temp: t}))
-                n += 1
-                misc.imsave(im_dir + str(n) + '.jpg', sess.run(o[0], feed_dict={input: x, m.temp: t}))
-                n += 1
-            writer.add_summary(summary, i+1)
+            misc.imsave(im_dir + str(n) + '.jpg', sess.run(side_by_side[0], feed_dict={input: x, m.temp: t}))
+            n += 1
+            misc.imsave(im_dir + str(n) + '.jpg', sess.run(side_by_side[1], feed_dict={input: x, m.temp: t}))
+            n += 1
+            misc.imsave(im_dir + str(n) + '.jpg', sess.run(side_by_side[2], feed_dict={input: x, m.temp: t}))
+            n += 1
+            misc.imsave(im_dir + str(n) + '.jpg', sess.run(side_by_side[3], feed_dict={input: x, m.temp: t}))
+            n += 1
+            misc.imsave(im_dir + str(n) + '.jpg', sess.run(side_by_side[4], feed_dict={input: x, m.temp: t}))
+            n += 1
+            misc.imsave(im_dir + str(n) + '.jpg', sess.run(side_by_side[5], feed_dict={input: x, m.temp: t}))
+            n += 1
     print("Model restored")
