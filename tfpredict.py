@@ -98,10 +98,12 @@ sess = tf.Session(config=config)
 
 ############Data Input######################
 if val:
-    dataset = tf.data.Dataset.from_generator(imdata.load_val_data_gen,  (tf.float32)).prefetch(48)
+    dataset = tf.data.Dataset.from_generator(imdata.load_val_data_gen,  (tf.float32, tf.int32)).prefetch(48)
+    print('******************************************************************************')
 elif video:
     dataset = tf.data.Dataset.from_generator(imdata.load_vid_data_gen, (tf.float32, tf.int32)).prefetch(48)
-dataset = tf.data.Dataset.from_generator(imdata.load_vid_data_gen, (tf.float32, tf.int32))
+    print('&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&')
+# dataset = tf.data.Dataset.from_generator(imdata.load_vid_data_gen, (tf.float32, tf.int32))
 
 next_batch = dataset.make_one_shot_iterator().get_next()
 
@@ -141,8 +143,6 @@ with sess:
         summary = sess.run([merged, tLoss], feed_dict=feed_dict)
 
         if i % update == 0:
-            misc.imsave(im_dir + str(n) + '.jpg', sess.run(side_by_side[0], feed_dict={input: x, m.temp: t}))
-            n += 1
             misc.imsave(im_dir + str(n) + '.jpg', sess.run(side_by_side[1], feed_dict={input: x, m.temp: t}))
             n += 1
             misc.imsave(im_dir + str(n) + '.jpg', sess.run(side_by_side[2], feed_dict={input: x, m.temp: t}))
@@ -153,4 +153,7 @@ with sess:
             n += 1
             misc.imsave(im_dir + str(n) + '.jpg', sess.run(side_by_side[5], feed_dict={input: x, m.temp: t}))
             n += 1
+            misc.imsave(im_dir + str(n) + '.jpg', sess.run(side_by_side[0], feed_dict={input: x, m.temp: t}))
+            n += 1
+
     print("Model restored")

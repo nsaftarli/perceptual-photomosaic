@@ -28,6 +28,7 @@ snapshots/
 *.jpg
 *.png
 *.mov
+*.mp4
 #Test files
 tst.py
 

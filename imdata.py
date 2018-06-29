@@ -125,7 +125,7 @@ def load_val_data_gen(num_batches=100,
             x[i % batch_size] = np.asarray(img, dtype='uint8')
             if i == ind + batch_size:
                 ind += batch_size
-                yield x
+                yield x, ind
 
 def load_vid_data_gen(num_batches=100,
                       batch_size=6,
@@ -163,28 +163,6 @@ def load_vid_data_gen(num_batches=100,
             if i == ind + batch_size:
                 ind += batch_size
                 yield x,i+1
-
-
-
-    # ind = 0
-    # n = 0
-    # directory = os.listdir(video_dir)
-    # while True:
-    #     x = np.zeros((batch_size, img_rows, img_cols, 3), dtype='uint8')
-
-    #     for i in itertools.count(ind, 1):
-    #         if n == 700:
-    #             n = 0
-    #         # imgpath = video_dir + directory[n]
-    #         imgpath = video_dir + str(n+1) + '.jpg'
-    #         img = Image.open(imgpath)
-    #         x[n % batch_size] = np.asarray(img, dtype='uint8')
-    #         if n != 0 and n % (batch_size + 1) == 0:
-    #             yield x, n
-    #         n += 1
-
-
-
 
 
 def load_data_static(num=10000, img_rows=512, img_cols=512):
@@ -269,7 +247,7 @@ def overlay_img(path='./'):
 
 
 def make_template_ims(path='./assets/temp_pics/',temp_size=8):
-    imgpath = path + 'starry-night-van-gogh.jpg'
+    imgpath = path + 'a.jpg'
     # print(Image.)
     im = np.asarray(Image.open(imgpath).resize((287, 224)))
     template = np.zeros((8, 8, 3))
@@ -361,9 +339,9 @@ def resize_movie():
 if __name__ == '__main__':
     # create_char_img()
     # overlay_img()
-    # make_template_ims()
+    make_template_ims()
     # turn_im_into_templates()
     # make_face_templates()
     # resize_coco()
     # resize_movie()
-    load_vid_data_gen()
+    # load_vid_data_gen()

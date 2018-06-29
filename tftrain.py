@@ -113,6 +113,8 @@ next_batch = dataset.make_one_shot_iterator().get_next()
 
 if tmp == 'ascii':
     y = imdata.get_templates(path='./assets/char_set_alt/', num_temps=NUM_TEMPLATES)
+elif tmp == 'faces':
+    y = imdata.get_templates(path='./assets/face_templates/', num_temps=NUM_TEMPLATES)
 else:
     y = imdata.get_templates(path='./assets/cam_templates/', num_temps=NUM_TEMPLATES)
 
@@ -171,8 +173,15 @@ with sess:
                                               feed_dict=feed_dict)
         ##########################################################
 
+        # print(sess.run(tf.reduce_max(m.in_colour_map), feed_dict={input: x}))
+        # print(sess.run(tf.reduce_min(m.in_colour_map), feed_dict={input: x}))
+        # print(sess.run(tf.reduce_max(m.out_colour_map), feed_dict={input: x, m.temp: t}))
+        # print(sess.run(tf.reduce_min(m.out_colour_map), feed_dict={input: x, m.temp: t}))
         ################Saving/Logging############################
         if i % update == 0:
+            # print(sess.run(m.in_colour_map), feed_dict={input: x, m.temp: t})
+
+
             print('Template Set: ', tmp)
             print('Colour: ', rgb)
             print('Iteration #:', str(i))
@@ -205,3 +214,6 @@ with sess:
             if debug:
                 print("Input Range:", sess.run(m.gray_im[0, 3:7, 3:7, :]))
                 print("Output Range:", sess.run(m.reshaped_output[0, 3:7, 3:7, :],  feed_dict={m.temp: t}))
+
+slack_msg = 'Experiment done on gpu #' + str(gpu)
+slack_notify('nariman_saftarli', slack_msg)
