@@ -99,11 +99,8 @@ sess = tf.Session(config=config)
 ############Data Input######################
 if val:
     dataset = tf.data.Dataset.from_generator(imdata.load_val_data_gen,  (tf.float32, tf.int32)).prefetch(48)
-    print('******************************************************************************')
 elif video:
     dataset = tf.data.Dataset.from_generator(imdata.load_vid_data_gen, (tf.float32, tf.int32)).prefetch(48)
-    print('&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&')
-# dataset = tf.data.Dataset.from_generator(imdata.load_vid_data_gen, (tf.float32, tf.int32))
 
 next_batch = dataset.make_one_shot_iterator().get_next()
 
@@ -118,16 +115,12 @@ with tf.device('/gpu:'+str(0)):
     # m = ASCIINet(images=input, templates=y, batch_size=1)
     m = ASCIINet(images=input, templates=y, batch_size=6, trainable=False, rgb=rgb)
     tLoss = m.tLoss
-    # opt,  lr = optimize(tLoss)
     argmax = tf.one_hot(tf.argmax(m.softmax, axis=-1), depth=62)
     o = predictTop(argmax, m.temps, batch_size=6, rgb=True, num_temps=62, img_size=img_size)
-    print(m.softmax)
-    print(argmax)
     side_by_side = tf.concat([m.input, o], axis=2)
 merged = tf.summary.merge_all()
 
 saver = tf.train.Saver()
-
 lrate = base_lr
 
 with sess:

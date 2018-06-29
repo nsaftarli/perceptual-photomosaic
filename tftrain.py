@@ -45,7 +45,6 @@ argParser.add_argument('-g', '--gpu', dest="gpu", action="store", default=1, typ
 argParser.add_argument('-i', '--iterations', dest='iterations', action='store', default=0, type=int)
 argParser.add_argument('-u', '--update', dest='update', action='store', default=100, type=int)
 argParser.add_argument('-lr', '--learning-rate',  dest='lr', action='store', default=1e-6, type=float)
-argParser.add_argument('-db', '--debug', dest='debug', action='store', default=False, type=bool)
 argParser.add_argument('-t', '--temperature', dest='temp',  action='store',  default=1.0,  type=float)
 argParser.add_argument('-n', '--notes', dest='notes', action='store', default=None, type=str)
 argParser.add_argument('-d', '--dataset', dest='dset', action='store', default='Faces', type=str)
@@ -60,7 +59,6 @@ gpu = cmdArgs.gpu
 iterations = cmdArgs.iterations
 update = cmdArgs.update
 base_lr = cmdArgs.lr
-debug = cmdArgs.debug
 t = cmdArgs.temp
 notes = cmdArgs.notes
 dset = cmdArgs.dset
@@ -117,7 +115,6 @@ elif tmp == 'faces':
     y = imdata.get_templates(path='./assets/face_templates/', num_temps=NUM_TEMPLATES)
 else:
     y = imdata.get_templates(path='./assets/cam_templates/', num_temps=NUM_TEMPLATES)
-
 #########################################
 
 
@@ -125,8 +122,6 @@ else:
 # x = imdata.get_pebbles(path='./pebbles.jpg')
 # x = tf.convert_to_tensor(x, tf.float32)
 #############################################
-
-
 
 
 ##############Build Graph###################
@@ -152,14 +147,12 @@ with sess:
     writer = tf.summary.FileWriter(log_dir, sess.graph)
     n = 0
     for i in range(iterations):
-        ###############Temperature Schedule####################
+        #Temperature Schedule
         if i > 1 and i % 1000 == 0:
             if i < 8000:
                 t *= 2
-        #######################################################
 
-        ###############Forward Pass############################
-
+        #Forward Pass
         x, ind = sess.run(next_batch)
 
 
@@ -171,17 +164,9 @@ with sess:
 
         summary, result, totalLoss = sess.run([merged,  opt,  tLoss],
                                               feed_dict=feed_dict)
-        ##########################################################
 
-        # print(sess.run(tf.reduce_max(m.in_colour_map), feed_dict={input: x}))
-        # print(sess.run(tf.reduce_min(m.in_colour_map), feed_dict={input: x}))
-        # print(sess.run(tf.reduce_max(m.out_colour_map), feed_dict={input: x, m.temp: t}))
-        # print(sess.run(tf.reduce_min(m.out_colour_map), feed_dict={input: x, m.temp: t}))
         ################Saving/Logging############################
         if i % update == 0:
-            # print(sess.run(m.in_colour_map), feed_dict={input: x, m.temp: t})
-
-
             print('Template Set: ', tmp)
             print('Colour: ', rgb)
             print('Iteration #:', str(i))
@@ -211,9 +196,5 @@ with sess:
             # misc.imsave(im_dir + str(i) + 'o.jpg', sess.run(o[5], feed_dict={input: x, m.temp: t}))
         ##############################################################
 
-            if debug:
-                print("Input Range:", sess.run(m.gray_im[0, 3:7, 3:7, :]))
-                print("Output Range:", sess.run(m.reshaped_output[0, 3:7, 3:7, :],  feed_dict={m.temp: t}))
-
-slack_msg = 'Experiment done on gpu #' + str(gpu)
+slack_msg = 'Experiment done on gpu #' + str(gpu) + " on Delta"
 slack_notify('nariman_saftarli', slack_msg)
