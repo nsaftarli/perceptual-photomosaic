@@ -59,7 +59,7 @@ class ASCIINet:
 
         # ################Encoder##################################################################################
         with tf.name_scope('VGG_Encoder'):
-            self.encoder = VGG16(input=self.gray_input)
+            self.encoder = VGG16(input=self.input)
             self.decoder_in = self.encoder.pool3
 
         # ################Decoder##################################################################################
@@ -119,17 +119,13 @@ class ASCIINet:
         with tf.name_scope('soft_output'):
             self.view_output = tf.concat([self.output_r, self.output_g, self.output_b], axis=3)
 
-        ''' STUFF HERE '''
-        with tf.name_scope('gray_output'):
-            self.gray_output = rgb_to_gray(self.view_output)
-
         with tf.name_scope('blurred_out'):
-            self.blurred_out = self.blur_recombine(self.gray_output, w, stride=1)
+            self.blurred_out = self.blur_recombine(self.view_output, w, stride=1)
 
         ##########################################################################################################
 
         ################Gaussian Pyramid###########################################################################
-        self.in_d1 = self.blur_recombine(self.gray_input, w, stride=2)
+        self.in_d1 = self.blur_recombine(self.input, w, stride=2)
         self.in_d2 = self.blur_recombine(self.in_d1, w, stride=2)
         self.out_d1 = self.blur_recombine(self.blurred_out, w, stride=2)
         self.out_d2 = self.blur_recombine(self.out_d1, w, stride=2)
@@ -154,21 +150,9 @@ class ASCIINet:
                          (tf.losses.mean_squared_error(self.vgg_in_d1.conv2_1, self.vgg_out_d1.conv2_1)) + \
                          (tf.losses.mean_squared_error(self.vgg_in_d2.conv1_1, self.vgg_out_d2.conv1_1)) + \
                          (tf.losses.mean_squared_error(self.vgg_in_d2.conv2_1, self.vgg_out_d2.conv2_1))
-        self.structure_loss = self.f_loss1 + self.f_loss2 + self.f_loss3 + self.f_loss4 + self.f_loss5 + self.blur_loss
+        self.structure_loss = self.f_loss1 + self.f_loss2 + self.f_loss3 + self.f_loss4 + self.f_loss5 #+ self.blur_loss
         ###########################################################################################################
-
-        ##############Colour Loss##################################################################################
-        self.colour_map_in = self.get_avg_colour(rgb_to_lab(self.input))
-        self.colour_map_out = self.get_avg_colour(rgb_to_lab(self.view_output))
-
-        self.colour_loss = ((1/61) * (tf.losses.mean_squared_error(self.colour_map_in[:,:,:,1:], self.colour_map_out[:,:,:,1:]) +
-                                      (0.2 * tf.losses.mean_squared_error(self.colour_map_in[:,:,:,:1], self.colour_map_out[:,:,:,:1]))))
-        ###########################################################################################################
-
-
-        # self.loss = self.f_loss1 + self.f_loss2 + self.f_loss3 + self.f_loss4 + self.f_loss5
-        # self.tLoss = self.loss + self.blur_loss
-        self.tLoss = self.structure_loss + self.colour_loss
+        self.tLoss = self.structure_loss
         ##########################################################################################################
 
         self.entropy = EntropyRegularizer(self.softmax) * 1e3
@@ -186,8 +170,6 @@ class ASCIINet:
         # tf.summary.image('downsampled_in', self.im1)
         # tf.summary.image('downsampled_out', self.im2)
         # tf.summary.image('blurred_out', self.blurred_out)
-        tf.summary.image('input_colour_map', lab_to_rgb(self.colour_map_in))
-        tf.summary.image('output_colour_map', lab_to_rgb(self.colour_map_out))
 
         tf.summary.scalar('entropy', self.entropy)
         tf.summary.scalar('variance', self.variance)
@@ -195,7 +177,7 @@ class ASCIINet:
         # tf.summary.scalar('vgg_loss', self.loss)
         tf.summary.scalar('total_loss', self.tLoss)
         tf.summary.scalar('Struct_loss', self.structure_loss)
-        tf.summary.scalar('Colour_loss', self.colour_loss)
+        # tf.summary.scalar('Colour_loss', self.colour_loss)
 
         # tf.summary.image('e_1', tf.reduce_mean(self.encoder.conv1_1, axis=-1, keep_dims=True))
         # tf.summary.image('e_2', tf.reduce_mean(self.encoder.conv2_1, axis=-1, keep_dims=True))
