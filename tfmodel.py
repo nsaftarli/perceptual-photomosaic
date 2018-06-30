@@ -158,10 +158,11 @@ class ASCIINet:
         ###########################################################################################################
 
         ##############Colour Loss##################################################################################
-        self.colour_map_in = self.get_avg_colour(self.input)
-        self.colour_map_out = self.get_avg_colour(self.view_output)
+        self.colour_map_in = self.get_avg_colour(rgb_to_lab(self.input))
+        self.colour_map_out = self.get_avg_colour(rgb_to_lab(self.view_output))
 
-        self.colour_loss = 58 * (tf.losses.mean_squared_error(self.colour_map_in, self.colour_map_out))
+        self.colour_loss = ((1/61) * (tf.losses.mean_squared_error(self.colour_map_in[:,:,:,1:], self.colour_map_out[:,:,:,1:]) +
+                                      (0.2 * tf.losses.mean_squared_error(self.colour_map_in[:,:,:,:1], self.colour_map_out[:,:,:,:1]))))
         ###########################################################################################################
 
 
@@ -185,8 +186,8 @@ class ASCIINet:
         # tf.summary.image('downsampled_in', self.im1)
         # tf.summary.image('downsampled_out', self.im2)
         # tf.summary.image('blurred_out', self.blurred_out)
-        tf.summary.image('input_colour_map', self.colour_map_in)
-        tf.summary.image('output_colour_map', self.colour_map_out)
+        tf.summary.image('input_colour_map', lab_to_rgb(self.colour_map_in))
+        tf.summary.image('output_colour_map', lab_to_rgb(self.colour_map_out))
 
         tf.summary.scalar('entropy', self.entropy)
         tf.summary.scalar('variance', self.variance)
