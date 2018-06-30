@@ -192,6 +192,16 @@ def get_templates(path='./assets/char_set/', num_temps=16, rgb=True):
             images[0, :, :, :, j] = im
     return images 
 
+def get_emoji_templates(path='./assets/emoji_temps/', num_temps=16, rgb=True):
+    directory = os.listdir(path)
+    images = np.zeros((1, 16, 16, 3, num_temps))
+    for j in range (num_temps):
+        x = np.random.randint(0,573)
+        im = Image.open(path + directory[x]).resize((16, 16))
+        im = np.asarray(im, dtype='uint8')
+        images[0, ..., j] = im[..., :3]
+    return images
+
     # for j in range(num_temps):
     #     # im = Image.open(path + str(j) + '.png').convert('L')
     #     # images[0,:,:,j] = np.asarray(im,dtype='uint8')

@@ -30,9 +30,10 @@ text_cols = const.text_cols
 dims = const.char_count
 experiments_dir = const.experiments_dir
 coco_dir = const.coco_dir
-img_size = const.img_size
+img_orig_size = const.img_orig_size
 patch_size = const.patch_size
 num_patches = const.num_patches
+img_new_size = const.img_new_size
 
 
 
@@ -113,6 +114,8 @@ if tmp == 'ascii':
     y = imdata.get_templates(path='./assets/char_set_alt/', num_temps=NUM_TEMPLATES)
 elif tmp == 'faces':
     y = imdata.get_templates(path='./assets/face_templates/', num_temps=NUM_TEMPLATES)
+elif tmp == 'emoji':
+    y = imdata.get_emoji_templates(path='./assets/emoji_temps/', num_temps=NUM_TEMPLATES)
 else:
     y = imdata.get_templates(path='./assets/cam_templates/', num_temps=NUM_TEMPLATES)
 #########################################
@@ -126,12 +129,12 @@ else:
 
 ##############Build Graph###################
 with tf.device('/gpu:'+str(0)):
-    input = tf.placeholder(tf.float32, shape=(6, img_size, img_size, 3))
+    input = tf.placeholder(tf.float32, shape=(6, img_orig_size, img_orig_size, 3))
     m = ASCIINet(images=input, templates=y, rgb=rgb)
     tLoss = m.tLoss
     opt, lr = optimize(tLoss)
-    argmax = tf.one_hot(tf.argmax(m.softmax, axis=-1), depth=62)
-    o = predictTop(argmax, m.temps, batch_size=6, rgb=rgb, num_temps=62, img_size=img_size)
+    argmax = tf.one_hot(tf.argmax(m.softmax, axis=-1), depth=NUM_TEMPLATES)
+    o = predictTop(argmax, m.temps, batch_size=6, rgb=rgb, num_temps=NUM_TEMPLATES, img_size=img_new_size, patch_size=patch_size, softmax_size=m.softmax_size)
 merged = tf.summary.merge_all()
 ############################################
 

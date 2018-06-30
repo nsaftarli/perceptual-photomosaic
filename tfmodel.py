@@ -19,7 +19,7 @@ text_cols = const.text_cols
 dims = const.char_count
 experiments_dir = const.experiments_dir
 coco_dir = const.coco_dir
-img_size = const.img_size
+img_new_size = const.img_new_size
 patch_size = const.patch_size
 num_patches = const.num_patches
 
@@ -33,8 +33,8 @@ PATCH_SIZE = 8
 IM_SHAPE = 512
 norm_type = 'group'
 
-w = tf.reshape(tf.constant(gauss2d_kernel(shape=(PATCH_SIZE, PATCH_SIZE), sigma=3), dtype=tf.float32),
-               [PATCH_SIZE, PATCH_SIZE, 1, 1])
+w = tf.reshape(tf.constant(gauss2d_kernel(shape=(patch_size, patch_size), sigma=3), dtype=tf.float32),
+               [patch_size, patch_size, 1, 1])
 
 
 class ASCIINet:
@@ -50,7 +50,7 @@ class ASCIINet:
 
     def build_network(self, input, templates, batch_size, trainable, rgb):
 
-        self.input = input
+        self.input = tf.image.resize_images(input, [IM_SHAPE, IM_SHAPE], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
 
         # Get grayscale version of image
         with tf.name_scope('grayscale_input'):
@@ -77,50 +77,57 @@ class ASCIINet:
         if not rgb:
             self.template_tensor = TemplateLayer(templates, rgb=False)
         else:
-            self.r, self.g, self.b = TemplateLayer(templates, rgb=True)
+            self.r, self.g, self.b = TemplateLayer(templates, rgb=True, new_size=patch_size)
             r = tf.expand_dims(self.r, axis=3)
             g = tf.expand_dims(self.g, axis=3)
             b = tf.expand_dims(self.b, axis=3)
         self.temps = tf.concat([r, g, b], axis=3)
         # #################Colour templates##############################
-        self.r = tf.transpose(tf.reshape(self.r, [-1, PATCH_SIZE ** 2, NUM_TEMPLATES]), perm=[0, 2, 1])
+        self.r = tf.transpose(tf.reshape(self.r, [-1, patch_size ** 2, NUM_TEMPLATES]), perm=[0, 2, 1])
         self.r = tf.tile(self.r, [batch_size, 1, 1])
 
-        self.g = tf.transpose(tf.reshape(self.g, [-1, PATCH_SIZE ** 2, NUM_TEMPLATES]), perm=[0, 2, 1])
+        self.g = tf.transpose(tf.reshape(self.g, [-1, patch_size ** 2, NUM_TEMPLATES]), perm=[0, 2, 1])
         self.g = tf.tile(self.g, [batch_size, 1, 1])
 
-        self.b = tf.transpose(tf.reshape(self.b, [-1, PATCH_SIZE ** 2, NUM_TEMPLATES]), perm=[0, 2, 1])
+        self.b = tf.transpose(tf.reshape(self.b, [-1, patch_size ** 2, NUM_TEMPLATES]), perm=[0, 2, 1])
         self.b = tf.tile(self.b, [batch_size, 1, 1])
 
         ##########################################################################################################
 
         # ###############Softmax###################################################################################
         self.softmax = tf.nn.softmax(self.conv12 * self.temp)
-        self.reshaped_softmax = tf.reshape(self.softmax,[-1, (IM_SHAPE//PATCH_SIZE) ** 2, NUM_TEMPLATES])
+        self.softmax_size = self.softmax.get_shape().as_list()[1]
+        self.reshaped_softmax = tf.reshape(self.softmax,[-1, self.softmax_size ** 2, NUM_TEMPLATES])
+        print('****************************')
+        print(self.softmax.get_shape())
+        print(self.r.get_shape())
+        print(self.reshaped_softmax.get_shape())
+        print('*********************************')
         ##########################################################################################################
 
         ###############Output#####################################################################################
         with tf.name_scope('output_and_tile'):
             self.output_r = tf.matmul(self.reshaped_softmax, self.r)
+            print(self.output_r.get_shape())
             self.output_r = tf.reshape(tf.transpose(tf.reshape(
-                self.output_r, [batch_size, (IM_SHAPE//PATCH_SIZE), (IM_SHAPE//PATCH_SIZE), 8, 8]),
-                perm=[0, 1, 3, 2, 4]), [batch_size, IM_SHAPE, IM_SHAPE, 1])
+                self.output_r, [batch_size, self.softmax_size, self.softmax_size, patch_size, patch_size]),
+                perm=[0, 1, 3, 2, 4]), [batch_size, IM_SHAPE * 2, IM_SHAPE * 2, 1])
 
             self.output_g = tf.matmul(self.reshaped_softmax, self.g)
             self.output_g = tf.reshape(tf.transpose(tf.reshape(
-                self.output_g, [batch_size, (IM_SHAPE//PATCH_SIZE), (IM_SHAPE//PATCH_SIZE), 8, 8]),
-                perm=[0, 1, 3, 2, 4]), [batch_size, IM_SHAPE, IM_SHAPE, 1])
+                self.output_g, [batch_size, self.softmax_size, self.softmax_size, patch_size, patch_size]),
+                perm=[0, 1, 3, 2, 4]), [batch_size, IM_SHAPE * 2, IM_SHAPE * 2, 1])
 
             self.output_b = tf.matmul(self.reshaped_softmax, self.b)
             self.output_b = tf.reshape(tf.transpose(tf.reshape(
-                self.output_b, [batch_size, (IM_SHAPE//PATCH_SIZE), (IM_SHAPE//PATCH_SIZE), 8, 8]),
-                perm=[0, 1, 3, 2, 4]), [batch_size, IM_SHAPE, IM_SHAPE, 1])
+                self.output_b, [batch_size, self.softmax_size, self.softmax_size, patch_size, patch_size]),
+                perm=[0, 1, 3, 2, 4]), [batch_size, IM_SHAPE * 2, IM_SHAPE * 2, 1])
 
         with tf.name_scope('soft_output'):
             self.view_output = tf.concat([self.output_r, self.output_g, self.output_b], axis=3)
 
         with tf.name_scope('blurred_out'):
-            self.blurred_out = self.blur_recombine(self.view_output, w, stride=1)
+            self.blurred_out = self.blur_recombine(self.view_output, w, stride=2)
 
         ##########################################################################################################
 
@@ -152,7 +159,7 @@ class ASCIINet:
                          (tf.losses.mean_squared_error(self.vgg_in_d2.conv2_1, self.vgg_out_d2.conv2_1))
         self.structure_loss = self.f_loss1 + self.f_loss2 + self.f_loss3 + self.f_loss4 + self.f_loss5 #+ self.blur_loss
         ###########################################################################################################
-        self.tLoss = self.structure_loss
+        self.tLoss = self.structure_loss + self.blur_loss
         ##########################################################################################################
 
         self.entropy = EntropyRegularizer(self.softmax) * 1e3
@@ -161,7 +168,7 @@ class ASCIINet:
 
 
     def get_avg_colour(self, input):
-        return tf.nn.avg_pool(input, ksize=[1, PATCH_SIZE, PATCH_SIZE, 1], strides=[1, PATCH_SIZE, PATCH_SIZE, 1], padding='VALID')
+        return tf.nn.avg_pool(input, ksize=[1, patch_size, patch_size, 1], strides=[1, patch_size, patch_size, 1], padding='VALID')
 
 
     def build_summaries(self):
