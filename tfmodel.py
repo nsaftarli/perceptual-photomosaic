@@ -50,8 +50,11 @@ class ASCIINet:
 
     def build_network(self, input, templates, batch_size, trainable, rgb):
 
-        self.input = tf.image.resize_images(input, [IM_SHAPE, IM_SHAPE], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+        self.input = input
 
+        input_size = self.input.get_shape().as_list()[1]
+        if input_size is not IM_SHAPE:
+            self.input = tf.image.resize_images(input, [IM_SHAPE, IM_SHAPE], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
         # Get grayscale version of image
         with tf.name_scope('grayscale_input'):
             # self.gray_input = tf.tile(tf.reduce_mean(self.input, axis=-1, keep_dims=True), [1, 1, 1, 3])
@@ -111,23 +114,23 @@ class ASCIINet:
             print(self.output_r.get_shape())
             self.output_r = tf.reshape(tf.transpose(tf.reshape(
                 self.output_r, [batch_size, self.softmax_size, self.softmax_size, patch_size, patch_size]),
-                perm=[0, 1, 3, 2, 4]), [batch_size, IM_SHAPE * 2, IM_SHAPE * 2, 1])
+                perm=[0, 1, 3, 2, 4]), [batch_size, IM_SHAPE, IM_SHAPE, 1])
 
             self.output_g = tf.matmul(self.reshaped_softmax, self.g)
             self.output_g = tf.reshape(tf.transpose(tf.reshape(
                 self.output_g, [batch_size, self.softmax_size, self.softmax_size, patch_size, patch_size]),
-                perm=[0, 1, 3, 2, 4]), [batch_size, IM_SHAPE * 2, IM_SHAPE * 2, 1])
+                perm=[0, 1, 3, 2, 4]), [batch_size, IM_SHAPE, IM_SHAPE, 1])
 
             self.output_b = tf.matmul(self.reshaped_softmax, self.b)
             self.output_b = tf.reshape(tf.transpose(tf.reshape(
                 self.output_b, [batch_size, self.softmax_size, self.softmax_size, patch_size, patch_size]),
-                perm=[0, 1, 3, 2, 4]), [batch_size, IM_SHAPE * 2, IM_SHAPE * 2, 1])
+                perm=[0, 1, 3, 2, 4]), [batch_size, IM_SHAPE, IM_SHAPE, 1])
 
         with tf.name_scope('soft_output'):
             self.view_output = tf.concat([self.output_r, self.output_g, self.output_b], axis=3)
 
         with tf.name_scope('blurred_out'):
-            self.blurred_out = self.blur_recombine(self.view_output, w, stride=2)
+            self.blurred_out = self.blur_recombine(self.view_output, w, stride=1)
 
         ##########################################################################################################
 
@@ -155,8 +158,14 @@ class ASCIINet:
 
         self.blur_loss = (tf.losses.mean_squared_error(self.vgg_in_d1.conv1_1, self.vgg_out_d1.conv1_1)) + \
                          (tf.losses.mean_squared_error(self.vgg_in_d1.conv2_1, self.vgg_out_d1.conv2_1)) + \
+                         (tf.losses.mean_squared_error(self.vgg_in_d1.conv3_1, self.vgg_out_d1.conv3_1)) + \
+                         (tf.losses.mean_squared_error(self.vgg_in_d1.conv4_1, self.vgg_out_d1.conv4_1)) + \
+                         (tf.losses.mean_squared_error(self.vgg_in_d1.conv5_1, self.vgg_out_d1.conv5_1)) + \
                          (tf.losses.mean_squared_error(self.vgg_in_d2.conv1_1, self.vgg_out_d2.conv1_1)) + \
-                         (tf.losses.mean_squared_error(self.vgg_in_d2.conv2_1, self.vgg_out_d2.conv2_1))
+                         (tf.losses.mean_squared_error(self.vgg_in_d2.conv2_1, self.vgg_out_d2.conv2_1)) + \
+                         (tf.losses.mean_squared_error(self.vgg_in_d2.conv3_1, self.vgg_out_d2.conv3_1)) + \
+                         (tf.losses.mean_squared_error(self.vgg_in_d2.conv4_1, self.vgg_out_d2.conv4_1)) + \
+                         (tf.losses.mean_squared_error(self.vgg_in_d2.conv5_1, self.vgg_out_d2.conv5_1))
         self.structure_loss = self.f_loss1 + self.f_loss2 + self.f_loss3 + self.f_loss4 + self.f_loss5 #+ self.blur_loss
         ###########################################################################################################
         self.tLoss = self.structure_loss + self.blur_loss
