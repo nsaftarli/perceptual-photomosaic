@@ -52,6 +52,9 @@ argParser.add_argument('-d', '--dataset', dest='dset', action='store', default='
 argParser.add_argument('-rgb', '--colour', dest='rgb', action='store', default=False, type=bool)
 argParser.add_argument('-tmp', '--templates', dest='tmp', action='store', default='other', type=str)
 argParser.add_argument('-v', '--video', dest='vid', action='store', default=False, type=bool)
+argParser.add_argument('-logf', '--logfreq', dest='logf', action='store', default=10, type=int)
+argParser.add_argument('-savef', '--savefreq', dest='savef', action='store', default=500, type=int)
+argParser.add_argument('-chkpt', '-chkptfreq', dest='chkpt', action='store', default=1000, type=int)
 cmdArgs = argParser.parse_args()
 ##################################################
 
@@ -66,7 +69,10 @@ dset = cmdArgs.dset
 rgb = cmdArgs.rgb
 tmp = cmdArgs.tmp
 vid = cmdArgs.vid
-NUM_TEMPLATES = 62
+logfreq = cmdArgs.logfreq
+savefreq = cmdArgs.savefreq
+chkptfreq = cmdArgs.chkpt
+NUM_TEMPLATES = const.num_templates
 
 
 #####File Handling###############################
@@ -115,7 +121,7 @@ if tmp == 'ascii':
 elif tmp == 'faces':
     y = imdata.get_templates(path='./assets/face_templates/', num_temps=NUM_TEMPLATES)
 elif tmp == 'emoji':
-    y = imdata.get_emoji_templates(path='./assets/emoji_temps/', num_temps=NUM_TEMPLATES)
+    y = imdata.get_templates(path='./assets/emoji_temps_full_8/', temp_size=8, num_temps=NUM_TEMPLATES)
 else:
     y = imdata.get_templates(path='./assets/cam_templates/', num_temps=NUM_TEMPLATES)
 #########################################
@@ -169,7 +175,7 @@ with sess:
                                               feed_dict=feed_dict)
 
         ################Saving/Logging############################
-        if i % update == 0:
+        if i % savefreq == 0:
             print('Template Set: ', tmp)
             print('Colour: ', rgb)
             print('Iteration #:', str(i))
@@ -182,16 +188,21 @@ with sess:
             print('Experiment directory: ', experiments_dir)
             print('Save directory: ', snapshot_dir)
             print('Log directory: ', log_dir)
-
-
-            values = sess.run(m.softmax[0,  17, :, :],  feed_dict={input: x, m.temp: t})
-            for j in range(64):
-                log_histogram(writer,  'coeff' + str(j),  values[j, :], i, bins=NUM_TEMPLATES)
-            writer.add_summary(summary, i+1)
-            chkpt.save(sess, snapshot_dir + 'checkpoint.chkpt')
             misc.imsave(im_dir + str(i) + 'i.jpg', sess.run(m.input[1], feed_dict={input: x, m.temp: t}))
             misc.imsave(im_dir + str(i) + 's.jpg', sess.run(m.view_output[1], feed_dict={input: x, m.temp: t}))
             misc.imsave(im_dir + str(i) + 'o.jpg', sess.run(o[1], feed_dict={input: x, m.temp: t}))
+
+
+        if i % logfreq == 0:
+            writer.add_summary(summary, i+1)
+        if i % chkptfreq == 0:
+            chkpt.save(sess, snapshot_dir + 'checkpoint_' + str(i) + '.chkpt')
+
+
+            # values = sess.run(m.softmax[0,  17, :, :],  feed_dict={input: x, m.temp: t})
+            # for j in range(64):
+                # log_histogram(writer,  'coeff' + str(j),  values[j, :], i, bins=NUM_TEMPLATES)
+
             # misc.imsave(im_dir + str(i) + 'o.jpg', sess.run(o[1], feed_dict={input: x, m.temp: t}))
             # misc.imsave(im_dir + str(i) + 'o.jpg', sess.run(o[2], feed_dict={input: x, m.temp: t}))
             # misc.imsave(im_dir + str(i) + 'o.jpg', sess.run(o[3], feed_dict={input: x, m.temp: t}))

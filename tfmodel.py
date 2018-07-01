@@ -22,13 +22,14 @@ coco_dir = const.coco_dir
 img_new_size = const.img_new_size
 patch_size = const.patch_size
 num_patches = const.num_patches
+num_templates = const.num_templates
 
 
 
 
 
 VGG_MEAN = [103.939, 116.779, 123.68]
-NUM_TEMPLATES = 62
+NUM_TEMPLATES = const.num_templates
 PATCH_SIZE = 8
 IM_SHAPE = 512
 norm_type = 'group'
@@ -53,8 +54,8 @@ class ASCIINet:
         self.input = input
 
         input_size = self.input.get_shape().as_list()[1]
-        if input_size is not IM_SHAPE:
-            self.input = tf.image.resize_images(input, [IM_SHAPE, IM_SHAPE], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+        # if input_size is not img_new_size:
+            # self.input = tf.image.resize_images(input, [img_new_size, img_new_size], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
         # Get grayscale version of image
         with tf.name_scope('grayscale_input'):
             # self.gray_input = tf.tile(tf.reduce_mean(self.input, axis=-1, keep_dims=True), [1, 1, 1, 3])
@@ -64,6 +65,7 @@ class ASCIINet:
         with tf.name_scope('VGG_Encoder'):
             self.encoder = VGG16(input=self.input)
             self.decoder_in = self.encoder.pool3
+            # self.decoder_in = tf.nn.avg_pool(self.encoder.pool3, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='VALID')
 
         # ################Decoder##################################################################################
         with tf.name_scope("Decoder"):
@@ -114,17 +116,17 @@ class ASCIINet:
             print(self.output_r.get_shape())
             self.output_r = tf.reshape(tf.transpose(tf.reshape(
                 self.output_r, [batch_size, self.softmax_size, self.softmax_size, patch_size, patch_size]),
-                perm=[0, 1, 3, 2, 4]), [batch_size, IM_SHAPE, IM_SHAPE, 1])
+                perm=[0, 1, 3, 2, 4]), [batch_size, img_new_size, img_new_size, 1])
 
             self.output_g = tf.matmul(self.reshaped_softmax, self.g)
             self.output_g = tf.reshape(tf.transpose(tf.reshape(
                 self.output_g, [batch_size, self.softmax_size, self.softmax_size, patch_size, patch_size]),
-                perm=[0, 1, 3, 2, 4]), [batch_size, IM_SHAPE, IM_SHAPE, 1])
+                perm=[0, 1, 3, 2, 4]), [batch_size, img_new_size, img_new_size, 1])
 
             self.output_b = tf.matmul(self.reshaped_softmax, self.b)
             self.output_b = tf.reshape(tf.transpose(tf.reshape(
                 self.output_b, [batch_size, self.softmax_size, self.softmax_size, patch_size, patch_size]),
-                perm=[0, 1, 3, 2, 4]), [batch_size, IM_SHAPE, IM_SHAPE, 1])
+                perm=[0, 1, 3, 2, 4]), [batch_size, img_new_size, img_new_size, 1])
 
         with tf.name_scope('soft_output'):
             self.view_output = tf.concat([self.output_r, self.output_g, self.output_b], axis=3)
@@ -157,15 +159,12 @@ class ASCIINet:
         self.f_loss5 = tf.losses.mean_squared_error(self.encoder.conv5_1, self.vgg2.conv5_1)
 
         self.blur_loss = (tf.losses.mean_squared_error(self.vgg_in_d1.conv1_1, self.vgg_out_d1.conv1_1)) + \
-                         (tf.losses.mean_squared_error(self.vgg_in_d1.conv2_1, self.vgg_out_d1.conv2_1)) + \
-                         (tf.losses.mean_squared_error(self.vgg_in_d1.conv3_1, self.vgg_out_d1.conv3_1)) + \
-                         (tf.losses.mean_squared_error(self.vgg_in_d1.conv4_1, self.vgg_out_d1.conv4_1)) + \
-                         (tf.losses.mean_squared_error(self.vgg_in_d1.conv5_1, self.vgg_out_d1.conv5_1)) + \
                          (tf.losses.mean_squared_error(self.vgg_in_d2.conv1_1, self.vgg_out_d2.conv1_1)) + \
+                         (tf.losses.mean_squared_error(self.vgg_in_d1.conv2_1, self.vgg_out_d1.conv2_1)) + \
                          (tf.losses.mean_squared_error(self.vgg_in_d2.conv2_1, self.vgg_out_d2.conv2_1)) + \
-                         (tf.losses.mean_squared_error(self.vgg_in_d2.conv3_1, self.vgg_out_d2.conv3_1)) + \
-                         (tf.losses.mean_squared_error(self.vgg_in_d2.conv4_1, self.vgg_out_d2.conv4_1)) + \
-                         (tf.losses.mean_squared_error(self.vgg_in_d2.conv5_1, self.vgg_out_d2.conv5_1))
+                         (tf.losses.mean_squared_error(self.vgg_in_d1.conv3_1, self.vgg_out_d1.conv3_1)) + \
+                         (tf.losses.mean_squared_error(self.vgg_in_d2.conv3_1, self.vgg_out_d2.conv3_1))
+
         self.structure_loss = self.f_loss1 + self.f_loss2 + self.f_loss3 + self.f_loss4 + self.f_loss5 #+ self.blur_loss
         ###########################################################################################################
         self.tLoss = self.structure_loss + self.blur_loss

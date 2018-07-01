@@ -117,7 +117,7 @@ with tf.device('/gpu:'+str(0)):
     tLoss = m.tLoss
     argmax = tf.one_hot(tf.argmax(m.softmax, axis=-1), depth=62)
     o = predictTop(argmax, m.temps, batch_size=6, rgb=True, num_temps=62, img_size=img_size, softmax_size=m.softmax_size, patch_size=patch_size)
-    # side_by_side = tf.concat([m.input, o], axis=2)
+    side_by_side = tf.concat([m.input, o], axis=2)
 merged = tf.summary.merge_all()
 
 saver = tf.train.Saver()
@@ -136,23 +136,23 @@ with sess:
         summary = sess.run([merged, tLoss], feed_dict=feed_dict)
 
         if i % update == 0:
-            misc.imsave(im_dir + str(n) + 'i.jpg', sess.run(m.input[1], feed_dict={input: x, m.temp: t}))
-            misc.imsave(im_dir + str(n) + 'o.jpg', sess.run(o[1], feed_dict={input: x, m.temp: t}))
+            # misc.imsave(im_dir + str(n) + 'i.jpg', sess.run(m.input[1], feed_dict={input: x, m.temp: t}))
+            misc.imsave(im_dir + str(n) + 'o.png', sess.run(side_by_side[1], feed_dict={input: x, m.temp: t}))
             n += 1
-            misc.imsave(im_dir + str(n) + 'i.jpg', sess.run(m.input[2], feed_dict={input: x, m.temp: t}))
-            misc.imsave(im_dir + str(n) + 'o.jpg', sess.run(o[2], feed_dict={input: x, m.temp: t}))
+            # misc.imsave(im_dir + str(n) + 'i.jpg', sess.run(m.input[2], feed_dict={input: x, m.temp: t}))
+            misc.imsave(im_dir + str(n) + 'o.png', sess.run(side_by_side[2], feed_dict={input: x, m.temp: t}))
             n += 1
-            misc.imsave(im_dir + str(n) + 'i.jpg', sess.run(m.input[3], feed_dict={input: x, m.temp: t}))
-            misc.imsave(im_dir + str(n) + 'o.jpg', sess.run(o[3], feed_dict={input: x, m.temp: t}))
+            # misc.imsave(im_dir + str(n) + 'i.jpg', sess.run(m.input[3], feed_dict={input: x, m.temp: t}))
+            misc.imsave(im_dir + str(n) + 'o.png', sess.run(side_by_side[3], feed_dict={input: x, m.temp: t}))
             n += 1
-            misc.imsave(im_dir + str(n) + 'i.jpg', sess.run(m.input[4], feed_dict={input: x, m.temp: t}))
-            misc.imsave(im_dir + str(n) + 'o.jpg', sess.run(o[4], feed_dict={input: x, m.temp: t}))
+            # misc.imsave(im_dir + str(n) + 'i.jpg', sess.run(m.input[4], feed_dict={input: x, m.temp: t}))
+            misc.imsave(im_dir + str(n) + 'o.png', sess.run(side_by_side[4], feed_dict={input: x, m.temp: t}))
             n += 1
-            misc.imsave(im_dir + str(n) + 'i.jpg', sess.run(m.input[5], feed_dict={input: x, m.temp: t}))
-            misc.imsave(im_dir + str(n) + 'o.jpg', sess.run(o[5], feed_dict={input: x, m.temp: t}))
+            # misc.imsave(im_dir + str(n) + 'i.jpg', sess.run(m.input[5], feed_dict={input: x, m.temp: t}))
+            misc.imsave(im_dir + str(n) + 'o.png', sess.run(side_by_side[5], feed_dict={input: x, m.temp: t}))
             n += 1
-            misc.imsave(im_dir + str(n) + 'i.jpg', sess.run(m.input[0], feed_dict={input: x, m.temp: t}))
-            misc.imsave(im_dir + str(n) + 'o.jpg', sess.run(o[0], feed_dict={input: x, m.temp: t}))
+            # misc.imsave(im_dir + str(n) + 'i.jpg', sess.run(m.input[0], feed_dict={input: x, m.temp: t}))
+            misc.imsave(im_dir + str(n) + 'o.png', sess.run(side_by_side[0], feed_dict={input: x, m.temp: t}))
             n += 1
 
     print("Model restored")
