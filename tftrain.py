@@ -69,8 +69,8 @@ dset = cmdArgs.dset
 rgb = cmdArgs.rgb
 tmp = cmdArgs.tmp
 vid = cmdArgs.vid
-logfreq = cmdArgs.logfreq
-savefreq = cmdArgs.savefreq
+logfreq = cmdArgs.logf
+savefreq = cmdArgs.savef
 chkptfreq = cmdArgs.chkpt
 NUM_TEMPLATES = const.num_templates
 

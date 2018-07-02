@@ -161,9 +161,7 @@ class ASCIINet:
         self.blur_loss = (tf.losses.mean_squared_error(self.vgg_in_d1.conv1_1, self.vgg_out_d1.conv1_1)) + \
                          (tf.losses.mean_squared_error(self.vgg_in_d2.conv1_1, self.vgg_out_d2.conv1_1)) + \
                          (tf.losses.mean_squared_error(self.vgg_in_d1.conv2_1, self.vgg_out_d1.conv2_1)) + \
-                         (tf.losses.mean_squared_error(self.vgg_in_d2.conv2_1, self.vgg_out_d2.conv2_1)) + \
-                         (tf.losses.mean_squared_error(self.vgg_in_d1.conv3_1, self.vgg_out_d1.conv3_1)) + \
-                         (tf.losses.mean_squared_error(self.vgg_in_d2.conv3_1, self.vgg_out_d2.conv3_1))
+                         (tf.losses.mean_squared_error(self.vgg_in_d2.conv2_1, self.vgg_out_d2.conv2_1))
 
         self.structure_loss = self.f_loss1 + self.f_loss2 + self.f_loss3 + self.f_loss4 + self.f_loss5 #+ self.blur_loss
         ###########################################################################################################
