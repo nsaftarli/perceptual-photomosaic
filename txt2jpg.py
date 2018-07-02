@@ -9,10 +9,11 @@ char_array = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '_', '+',
               '[', ']', '{', '}', '|', 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K',
               'L', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', '<', '>', '/', '?', '!',
               '@', '#', '$', '%', '^', '&', '*', '(', ')',  ' ']
-char_dir = "./assets/char_set_coloured/"
+char_dir = "./assets/ws_32/"
 print(len(char_array))
 print(char_dir)
 
+char_array = [' ']
 
 # char_array = ['/', '|', '\\', '-', 'L', 'O', '#', 'V', '.', ' ', ':', '~', '^', '!', '+', '=']
 # char_dir = "./assets/char_set_2/"
@@ -20,10 +21,10 @@ for i, char in enumerate(char_array):
     canvas = Image.new("RGB",  (32, 32),  (255, 255, 255))
 
     draw = ImageDraw.Draw(canvas)
-    myfont = ImageFont.truetype("./assets/fonts/RobotoMono-Regular.ttf", 32)
-    draw.text((6, -8), char,  font=myfont,  fill=(255, 255, 85))
+    myfont = ImageFont.truetype("./assets/fonts/RobotoMono-Regular.ttf", 8)
+    draw.text((2, -2), char,  font=myfont,  fill=(0, 85, 255))
     # if i % 5 == 0:
     #   canvas.show()
-    img_title = char_dir + str(i + (14 * 62)) + ".png"
+    img_title = char_dir + str(i + (13 * 62)) + ".png"
 
     canvas.save(img_title,  "PNG")

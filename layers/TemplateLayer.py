@@ -15,9 +15,11 @@ def TemplateLayer(templates, rgb=False, new_size=8):
     else:
         temps = tf.constant(value=templates, dtype=tf.float32, shape=templates.shape, name='templates')
         if template_shape is not new_size:
-            temps = tf.image.resize_images(tf.transpose(temps,[0, 4, 1, 2, 3])[0],
-                                           size=[new_size, new_size],
-                                           method=tf.image.ResizeMethod.BILINEAR)
+            downsampled_shape = template_shape // new_size
+            temps = tf.nn.avg_pool(temps, [1,downsampled_shape,downsampled_shape,1,1])
+            # temps = tf.image.resize_images(tf.transpose(temps,[0, 4, 1, 2, 3])[0],
+                                           # size=[new_size, new_size],
+                                           # method=tf.image.ResizeMethod.BILINEAR)
             temps = tf.expand_dims(tf.transpose(temps,[1, 2, 3, 0]), 0)
         print('AAAAAAAAAAAAAAA')
         print(temps.get_shape())

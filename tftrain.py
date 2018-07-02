@@ -54,7 +54,7 @@ argParser.add_argument('-tmp', '--templates', dest='tmp', action='store', defaul
 argParser.add_argument('-v', '--video', dest='vid', action='store', default=False, type=bool)
 argParser.add_argument('-logf', '--logfreq', dest='logf', action='store', default=10, type=int)
 argParser.add_argument('-savef', '--savefreq', dest='savef', action='store', default=500, type=int)
-argParser.add_argument('-chkpt', '-chkptfreq', dest='chkpt', action='store', default=1000, type=int)
+argParser.add_argument('-chkpt', '-chkptfreq', dest='chkpt', action='store', default=500, type=int)
 cmdArgs = argParser.parse_args()
 ##################################################
 
@@ -113,19 +113,21 @@ sess = tf.Session(config=config)
 if not vid:
     dataset = tf.data.Dataset.from_generator(imdata.load_data_gen,  (tf.float32, tf.int32)).prefetch(12)
 else:
-    dataset = tf.data.Dataset.from_generator(imdata.load_vid_data_gen, (tf.float32, tf.int32))
+    dataset = tf.data.Dataset.from_generator(imdata.load_vid_data_gen, (tf.float32, tf.int32)).prefetch(12)
 next_batch = dataset.make_one_shot_iterator().get_next()
 
 if tmp == 'ascii':
-    y = imdata.get_templates(path='./assets/char_set_alt/', num_temps=NUM_TEMPLATES)
+    y = imdata.get_other_templates(path='./assets/char_set_alt/')
 elif tmp == 'col_ascii':
-    y = imdata.get_colour_ascii_templates(path='./assets/char_set_coloured/')
+    y = imdata.get_other_templates(path='./assets/char_set_coloured_8/')
 elif tmp == 'flags':
-    y = imdata.get_other_templates(path='./assets/flag_temps/')
+    y = imdata.get_other_templates(path='./assets/flag_temps_8/')
 elif tmp == 'faces':
     y = imdata.get_templates(path='./assets/face_templates/', num_temps=NUM_TEMPLATES)
 elif tmp == 'emoji':
     y = imdata.get_templates(path='./assets/emoji_temps_full_8/', temp_size=8, num_temps=NUM_TEMPLATES)
+elif tmp == 'stars':
+    y = imdata.get_other_templates(path='./assets/star_temps_2_8/')
 else:
     y = imdata.get_templates(path='./assets/cam_templates/', num_temps=NUM_TEMPLATES)
 #########################################
@@ -214,5 +216,6 @@ with sess:
             # misc.imsave(im_dir + str(i) + 'o.jpg', sess.run(o[5], feed_dict={input: x, m.temp: t}))
         ##############################################################
 
+chkpt.save(sess, snapshot_dir + 'checkpoint_final.chkpt')
 slack_msg = 'Experiment done on gpu #' + str(gpu) + " on Delta"
 slack_notify('nariman_saftarli', slack_msg)
