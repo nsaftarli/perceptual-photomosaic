@@ -30,9 +30,10 @@ text_cols = const.text_cols
 dims = const.char_count
 experiments_dir = const.experiments_dir
 coco_dir = const.coco_dir
-img_size = const.img_size
+img_orig_size = const.img_orig_size
 patch_size = const.patch_size
 num_patches = const.num_patches
+img_new_size = const.img_new_size
 
 
 
@@ -45,13 +46,15 @@ argParser.add_argument('-g', '--gpu', dest="gpu", action="store", default=1, typ
 argParser.add_argument('-i', '--iterations', dest='iterations', action='store', default=0, type=int)
 argParser.add_argument('-u', '--update', dest='update', action='store', default=100, type=int)
 argParser.add_argument('-lr', '--learning-rate',  dest='lr', action='store', default=1e-6, type=float)
-argParser.add_argument('-db', '--debug', dest='debug', action='store', default=False, type=bool)
 argParser.add_argument('-t', '--temperature', dest='temp',  action='store',  default=1.0,  type=float)
 argParser.add_argument('-n', '--notes', dest='notes', action='store', default=None, type=str)
 argParser.add_argument('-d', '--dataset', dest='dset', action='store', default='Faces', type=str)
 argParser.add_argument('-rgb', '--colour', dest='rgb', action='store', default=False, type=bool)
 argParser.add_argument('-tmp', '--templates', dest='tmp', action='store', default='other', type=str)
 argParser.add_argument('-v', '--video', dest='vid', action='store', default=False, type=bool)
+argParser.add_argument('-logf', '--logfreq', dest='logf', action='store', default=10, type=int)
+argParser.add_argument('-savef', '--savefreq', dest='savef', action='store', default=500, type=int)
+argParser.add_argument('-chkpt', '-chkptfreq', dest='chkpt', action='store', default=1000, type=int)
 cmdArgs = argParser.parse_args()
 ##################################################
 
@@ -60,14 +63,16 @@ gpu = cmdArgs.gpu
 iterations = cmdArgs.iterations
 update = cmdArgs.update
 base_lr = cmdArgs.lr
-debug = cmdArgs.debug
 t = cmdArgs.temp
 notes = cmdArgs.notes
 dset = cmdArgs.dset
 rgb = cmdArgs.rgb
 tmp = cmdArgs.tmp
 vid = cmdArgs.vid
-NUM_TEMPLATES = 62
+logfreq = cmdArgs.logf
+savefreq = cmdArgs.savef
+chkptfreq = cmdArgs.chkpt
+NUM_TEMPLATES = const.num_templates
 
 
 #####File Handling###############################
@@ -106,16 +111,19 @@ sess = tf.Session(config=config)
 
 ############Data Input######################
 if not vid:
-    dataset = tf.data.Dataset.from_generator(imdata.load_data_gen,  (tf.float32, tf.int32))
+    dataset = tf.data.Dataset.from_generator(imdata.load_data_gen,  (tf.float32, tf.int32)).prefetch(12)
 else:
     dataset = tf.data.Dataset.from_generator(imdata.load_vid_data_gen, (tf.float32, tf.int32))
 next_batch = dataset.make_one_shot_iterator().get_next()
 
 if tmp == 'ascii':
     y = imdata.get_templates(path='./assets/char_set_alt/', num_temps=NUM_TEMPLATES)
+elif tmp == 'faces':
+    y = imdata.get_templates(path='./assets/face_templates/', num_temps=NUM_TEMPLATES)
+elif tmp == 'emoji':
+    y = imdata.get_templates(path='./assets/emoji_temps_full_8/', temp_size=8, num_temps=NUM_TEMPLATES)
 else:
     y = imdata.get_templates(path='./assets/cam_templates/', num_temps=NUM_TEMPLATES)
-
 #########################################
 
 
@@ -125,16 +133,14 @@ else:
 #############################################
 
 
-
-
 ##############Build Graph###################
 with tf.device('/gpu:'+str(0)):
-    input = tf.placeholder(tf.float32, shape=(6, img_size, img_size, 3))
+    input = tf.placeholder(tf.float32, shape=(6, img_orig_size, img_orig_size, 3))
     m = ASCIINet(images=input, templates=y, rgb=rgb)
     tLoss = m.tLoss
     opt, lr = optimize(tLoss)
-    argmax = tf.one_hot(tf.argmax(m.softmax, axis=-1), depth=62)
-    o = predictTop(argmax, m.temps, batch_size=6, rgb=rgb, num_temps=62, img_size=img_size)
+    argmax = tf.one_hot(tf.argmax(m.softmax, axis=-1), depth=NUM_TEMPLATES)
+    o = predictTop(argmax, m.temps, batch_size=6, rgb=rgb, num_temps=NUM_TEMPLATES, img_size=img_new_size, patch_size=patch_size, softmax_size=m.softmax_size)
 merged = tf.summary.merge_all()
 ############################################
 
@@ -143,20 +149,19 @@ merged = tf.summary.merge_all()
 ############Training################################
 chkpt = tf.train.Saver()
 lrate = base_lr
+print('Num Variables: ', np.sum([np.product([xi.value for xi in x.get_shape()]) for x in tf.all_variables()]))
 
 with sess:
     sess.run(tf.global_variables_initializer())
     writer = tf.summary.FileWriter(log_dir, sess.graph)
     n = 0
     for i in range(iterations):
-        ###############Temperature Schedule####################
+        #Temperature Schedule
         if i > 1 and i % 1000 == 0:
             if i < 8000:
                 t *= 2
-        #######################################################
 
-        ###############Forward Pass############################
-
+        #Forward Pass
         x, ind = sess.run(next_batch)
 
 
@@ -168,10 +173,9 @@ with sess:
 
         summary, result, totalLoss = sess.run([merged,  opt,  tLoss],
                                               feed_dict=feed_dict)
-        ##########################################################
 
         ################Saving/Logging############################
-        if i % update == 0:
+        if i % savefreq == 0:
             print('Template Set: ', tmp)
             print('Colour: ', rgb)
             print('Iteration #:', str(i))
@@ -184,26 +188,21 @@ with sess:
             print('Experiment directory: ', experiments_dir)
             print('Save directory: ', snapshot_dir)
             print('Log directory: ', log_dir)
+            misc.imsave(im_dir + str(i) + 'i.jpg', sess.run(m.input[1], feed_dict={input: x, m.temp: t}))
+            misc.imsave(im_dir + str(i) + 's.jpg', sess.run(m.view_output[1], feed_dict={input: x, m.temp: t}))
+            misc.imsave(im_dir + str(i) + 'o.jpg', sess.run(o[1], feed_dict={input: x, m.temp: t}))
 
-            values = sess.run(m.softmax[0,  17, :, :],  feed_dict={input: x, m.temp: t})
-            for j in range(64):
-                log_histogram(writer,  'coeff' + str(j),  values[j, :], i, bins=NUM_TEMPLATES)
+
+        if i % logfreq == 0:
             writer.add_summary(summary, i+1)
-            chkpt.save(sess, snapshot_dir + 'checkpoint.chkpt')
-            # misc.imsave(im_dir + str(i) + 'i.jpg', sess.run(m.input[1], feed_dict={input: x, m.temp: t}))
-            # misc.imsave(im_dir + str(i) + 's.jpg', sess.run(m.view_output[1], feed_dict={input: x, m.temp: t}))
-            misc.imsave(im_dir + str(n) + 'o.jpg', sess.run(o[0], feed_dict={input: x, m.temp: t}))
-            n += 1
-            misc.imsave(im_dir + str(n) + 'o.jpg', sess.run(o[1], feed_dict={input: x, m.temp: t}))
-            n += 1
-            misc.imsave(im_dir + str(n) + 'o.jpg', sess.run(o[2], feed_dict={input: x, m.temp: t}))
-            n += 1
-            misc.imsave(im_dir + str(n) + 'o.jpg', sess.run(o[3], feed_dict={input: x, m.temp: t}))
-            n += 1
-            misc.imsave(im_dir + str(n) + 'o.jpg', sess.run(o[4], feed_dict={input: x, m.temp: t}))
-            n += 1
-            misc.imsave(im_dir + str(n) + 'o.jpg', sess.run(o[5], feed_dict={input: x, m.temp: t}))
-            n += 1
+        if i % chkptfreq == 0:
+            chkpt.save(sess, snapshot_dir + 'checkpoint_' + str(i) + '.chkpt')
+
+
+            # values = sess.run(m.softmax[0,  17, :, :],  feed_dict={input: x, m.temp: t})
+            # for j in range(64):
+                # log_histogram(writer,  'coeff' + str(j),  values[j, :], i, bins=NUM_TEMPLATES)
+
             # misc.imsave(im_dir + str(i) + 'o.jpg', sess.run(o[1], feed_dict={input: x, m.temp: t}))
             # misc.imsave(im_dir + str(i) + 'o.jpg', sess.run(o[2], feed_dict={input: x, m.temp: t}))
             # misc.imsave(im_dir + str(i) + 'o.jpg', sess.run(o[3], feed_dict={input: x, m.temp: t}))
@@ -211,6 +210,5 @@ with sess:
             # misc.imsave(im_dir + str(i) + 'o.jpg', sess.run(o[5], feed_dict={input: x, m.temp: t}))
         ##############################################################
 
-            if debug:
-                print("Input Range:", sess.run(m.gray_im[0, 3:7, 3:7, :]))
-                print("Output Range:", sess.run(m.reshaped_output[0, 3:7, 3:7, :],  feed_dict={m.temp: t}))
+slack_msg = 'Experiment done on gpu #' + str(gpu) + " on Delta"
+slack_notify('nariman_saftarli', slack_msg)

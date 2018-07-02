@@ -125,7 +125,7 @@ def load_val_data_gen(num_batches=100,
             x[i % batch_size] = np.asarray(img, dtype='uint8')
             if i == ind + batch_size:
                 ind += batch_size
-                yield x
+                yield x, ind
 
 def load_vid_data_gen(num_batches=100,
                       batch_size=6,
@@ -165,28 +165,6 @@ def load_vid_data_gen(num_batches=100,
                 yield x,i+1
 
 
-
-    # ind = 0
-    # n = 0
-    # directory = os.listdir(video_dir)
-    # while True:
-    #     x = np.zeros((batch_size, img_rows, img_cols, 3), dtype='uint8')
-
-    #     for i in itertools.count(ind, 1):
-    #         if n == 700:
-    #             n = 0
-    #         # imgpath = video_dir + directory[n]
-    #         imgpath = video_dir + str(n+1) + '.jpg'
-    #         img = Image.open(imgpath)
-    #         x[n % batch_size] = np.asarray(img, dtype='uint8')
-    #         if n != 0 and n % (batch_size + 1) == 0:
-    #             yield x, n
-    #         n += 1
-
-
-
-
-
 def load_data_static(num=10000, img_rows=512, img_cols=512):
         x = np.zeros((num, img_rows, img_cols, 3), dtype='uint8')
 
@@ -198,21 +176,62 @@ def load_data_static(num=10000, img_rows=512, img_cols=512):
         return x
 
 
-def get_templates(path='./assets/char_set/', num_temps=16, rgb=True):
+def get_templates(path='./assets/char_set/', temp_size=8, num_temps=16, rgb=True):
 
     if not rgb:
-        images = np.zeros((1, 8, 8, num_temps))
+        images = np.zeros((1, temp_size, temp_size, num_temps))
         for j in range(num_temps):
             im = Image.open(path + str(j) + '.png')
             im = np.asarray(im, dtype='uint8')
             images[0, :, :, j] = np.mean(im, axis=-1)
     else:
-        images = np.zeros((1, 8, 8, 3, num_temps))
+        images = np.zeros((1, temp_size, temp_size, 3, num_temps))
         for j in range(num_temps):
             im = Image.open(path + str(j) + '.png')
             im = np.asarray(im, dtype='uint8')
             images[0, :, :, :, j] = im
-    return images 
+    return images
+
+def get_emoji_templates(path='./assets/emoji_temps/', num_temps=16, rgb=True):
+    directory = os.listdir(path)
+    images = np.zeros((1, 16, 16, 3, num_temps))
+    for j in range (num_temps):
+        x = np.random.randint(0,573)
+        im = Image.open(path + directory[x]).resize((16, 16))
+        im = np.asarray(im, dtype='uint8')
+        images[0, ..., j] = im[..., :3]
+    return images
+
+def process_emojis(num_temps=62):
+    path_in = './assets/emoji_temps/'
+    path_out = './assets/emoji_temps_full_16/'
+    directory = os.listdir(path_in)
+
+    # im = Image.open(path + directory[1])
+    x = 0
+    for j in range(753):
+        # print(j)
+        im = Image.open(path_in + directory[j]).resize((16, 16))
+        im_arr = np.asarray(im, dtype='uint8')
+        print(im_arr.shape)
+        if len(im_arr.shape) < 3 or im_arr.shape[2] <= 2:
+            continue
+        if im_arr.shape[2] == 4:
+            im = pure_pil_alpha_to_color_v2(im)
+        im_arr = np.asarray(im, dtype='uint8')
+        print(im_arr.shape[2])
+        im.save(path_out + str(x) + '.png')
+        x += 1
+
+
+    # im.show()
+    # im = np.asarray(im, dtype='uint8')
+    # print(im.shape)
+    # im.show()
+    # # im = im.convert('RGB')
+    # # im.show()
+    # im2 = pure_pil_alpha_to_color_v2(im)
+    # im2.show()
 
     # for j in range(num_temps):
     #     # im = Image.open(path + str(j) + '.png').convert('L')
@@ -223,6 +242,23 @@ def get_templates(path='./assets/char_set/', num_temps=16, rgb=True):
     #     images[0, :, :, :, j] = im
     # # return tf.convert_to_tensor(images,tf.float32)
     # return images
+
+def pure_pil_alpha_to_color_v2(image, color=(255, 255, 255)):
+    """Alpha composite an RGBA Image with a specified color.
+
+    Simpler, faster version than the solutions above.
+
+    Source: http://stackoverflow.com/a/9459208/284318
+
+    Keyword Arguments:
+    image -- PIL RGBA Image object
+    color -- Tuple r, g, b (default 255, 255, 255)
+
+    """
+    image.load()  # needed for split()
+    background = Image.new('RGB', image.size, color)
+    background.paste(image, mask=image.split()[3])  # 3 is the alpha channel
+    return background
 
 
 def get_pebbles(path='./pebbles.jpg'):
@@ -269,7 +305,7 @@ def overlay_img(path='./'):
 
 
 def make_template_ims(path='./assets/temp_pics/',temp_size=8):
-    imgpath = path + 'starry-night-van-gogh.jpg'
+    imgpath = path + 'a.jpg'
     # print(Image.)
     im = np.asarray(Image.open(imgpath).resize((287, 224)))
     template = np.zeros((8, 8, 3))
@@ -345,6 +381,7 @@ def resize_coco():
         img.save(out_path + im)
 
 
+
 def resize_movie():
     in_path = '/home/nsaftarl/ASCIIArtNN/assets/mv/'
     out_path = '/home/nsaftarl/ASCIIArtNN/assets/mv-resized-512/'
@@ -366,4 +403,5 @@ if __name__ == '__main__':
     # make_face_templates()
     # resize_coco()
     # resize_movie()
-    load_vid_data_gen()
+    # load_vid_data_gen()
+    process_emojis()
