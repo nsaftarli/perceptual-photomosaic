@@ -101,8 +101,9 @@ class ASCIINet:
 
         # ###############Softmax###################################################################################
         self.softmax = tf.nn.softmax(self.conv12 * self.temp)
-        self.softmax_size = self.softmax.get_shape().as_list()[1]
-        self.reshaped_softmax = tf.reshape(self.softmax,[-1, self.softmax_size ** 2, NUM_TEMPLATES])
+        self.softmax_h = self.softmax.get_shape().as_list()[1]
+        self.softmax_w = self.softmax.get_shape().as_list()[2]
+        self.reshaped_softmax = tf.reshape(self.softmax,[-1, self.softmax_h * self.softmax_w, NUM_TEMPLATES])
         print('****************************')
         print(self.softmax.get_shape())
         print(self.r.get_shape())
@@ -115,18 +116,18 @@ class ASCIINet:
             self.output_r = tf.matmul(self.reshaped_softmax, self.r)
             print(self.output_r.get_shape())
             self.output_r = tf.reshape(tf.transpose(tf.reshape(
-                self.output_r, [batch_size, self.softmax_size, self.softmax_size, patch_size, patch_size]),
-                perm=[0, 1, 3, 2, 4]), [batch_size, img_new_size, img_new_size, 1])
+                self.output_r, [batch_size, self.softmax_h, self.softmax_w, patch_size, patch_size]),
+                perm=[0, 1, 3, 2, 4]), [batch_size, 376, img_new_size, 1])
 
             self.output_g = tf.matmul(self.reshaped_softmax, self.g)
             self.output_g = tf.reshape(tf.transpose(tf.reshape(
-                self.output_g, [batch_size, self.softmax_size, self.softmax_size, patch_size, patch_size]),
-                perm=[0, 1, 3, 2, 4]), [batch_size, img_new_size, img_new_size, 1])
+                self.output_g, [batch_size, self.softmax_h, self.softmax_w, patch_size, patch_size]),
+                perm=[0, 1, 3, 2, 4]), [batch_size, 376, img_new_size, 1])
 
             self.output_b = tf.matmul(self.reshaped_softmax, self.b)
             self.output_b = tf.reshape(tf.transpose(tf.reshape(
-                self.output_b, [batch_size, self.softmax_size, self.softmax_size, patch_size, patch_size]),
-                perm=[0, 1, 3, 2, 4]), [batch_size, img_new_size, img_new_size, 1])
+                self.output_b, [batch_size, self.softmax_h, self.softmax_w, patch_size, patch_size]),
+                perm=[0, 1, 3, 2, 4]), [batch_size, 376, img_new_size, 1])
 
         with tf.name_scope('soft_output'):
             self.view_output = tf.concat([self.output_r, self.output_g, self.output_b], axis=3)
@@ -163,7 +164,7 @@ class ASCIINet:
                          (tf.losses.mean_squared_error(self.vgg_in_d1.conv2_1, self.vgg_out_d1.conv2_1)) + \
                          (tf.losses.mean_squared_error(self.vgg_in_d2.conv2_1, self.vgg_out_d2.conv2_1))
 
-        self.structure_loss = self.f_loss1 + self.f_loss2 + self.f_loss3 + self.f_loss4 + self.f_loss5 #+ self.blur_loss
+        self.structure_loss = self.f_loss1 + self.f_loss2 + self.f_loss3 #+ self.f_loss4 + self.f_loss5 #+ self.blur_loss
         ###########################################################################################################
         self.tLoss = self.structure_loss + self.blur_loss
         ##########################################################################################################

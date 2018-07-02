@@ -129,7 +129,7 @@ def load_val_data_gen(num_batches=100,
 
 def load_vid_data_gen(num_batches=100,
                       batch_size=6,
-                      img_rows=512,
+                      img_rows=376,
                       img_cols=512):
 
     ind = 0
@@ -148,15 +148,19 @@ def load_vid_data_gen(num_batches=100,
 
 
         for i in itertools.count(ind, 1):
-            if i == 700:
+            if i == 5654:
                 ind = 0
+                n = 0
                 break
             # imgpath = img_data_dir + 'in_' + str(i) + '.jpg'
             # imgpath = coco_dir + 'COCO_train2014' + str(i) + '.jpg'
             # imgpath = coco_dir + directory[n]
-            imgpath = video_dir + str(i+1) + '.jpg'
-            print(imgpath)
-
+            # imgpath = video_dir + str(i+1) + '.jpg'
+            imgpath = video_dir + directory[n]
+            n += 1
+            # print(imgpath)
+            if n == len(directory):
+                n = 0
 
             img = Image.open(imgpath)
             x[i % batch_size] = np.asarray(img, dtype='uint8')
@@ -195,11 +199,22 @@ def get_templates(path='./assets/char_set/', temp_size=8, num_temps=16, rgb=True
 def get_emoji_templates(path='./assets/emoji_temps/', num_temps=16, rgb=True):
     directory = os.listdir(path)
     images = np.zeros((1, 16, 16, 3, num_temps))
-    for j in range (num_temps):
+    for j in range(num_temps):
         x = np.random.randint(0,573)
         im = Image.open(path + directory[x]).resize((16, 16))
         im = np.asarray(im, dtype='uint8')
         images[0, ..., j] = im[..., :3]
+    return images
+
+def get_other_templates(path='./assets/char_set_coloured/'):
+    directory = os.listdir(path)
+    num_temps = len(directory)
+    images = np.zeros((1, 8, 8, 3, num_temps))
+    for j in range(num_temps):
+        im = Image.open(path + directory[j]).resize((8, 8))
+        im = np.asarray(im, dtype='uint8')
+        images[0, ..., j] = im[..., :3]
+        # print(images.shape)
     return images
 
 def process_emojis(num_temps=62):
