@@ -128,14 +128,14 @@ def load_val_data_gen(num_batches=100,
                 yield x, ind
 
 def load_vid_data_gen(num_batches=100,
-                      batch_size=6,
+                      batch_size=100,
                       img_rows=376,
                       img_cols=512):
 
     ind = 0
     n = 0
 
-    directory = os.listdir(video_dir)
+    directory = sorted(os.listdir(video_dir))
     while True:
         x = np.zeros((batch_size, img_rows, img_cols, 3), dtype='uint8')
 
@@ -168,6 +168,12 @@ def load_vid_data_gen(num_batches=100,
                 ind += batch_size
                 yield x,i+1
 
+# def load_vid_data_val(num_batches=100,
+#                       batch_size=6,
+#                       img_rows=376,
+#                       img_cols=512):
+    
+
 
 def load_data_static(num=10000, img_rows=512, img_cols=512):
         x = np.zeros((num, img_rows, img_cols, 3), dtype='uint8')
@@ -191,6 +197,8 @@ def get_templates(path='./assets/char_set/', temp_size=8, num_temps=16, rgb=True
     else:
         images = np.zeros((1, temp_size, temp_size, 3, num_temps))
         for j in range(num_temps):
+            if j == 11:
+                continue
             im = Image.open(path + str(j) + '.png')
             im = np.asarray(im, dtype='uint8')
             images[0, :, :, :, j] = im
@@ -206,12 +214,12 @@ def get_emoji_templates(path='./assets/emoji_temps/', num_temps=16, rgb=True):
         images[0, ..., j] = im[..., :3]
     return images
 
-def get_other_templates(path='./assets/char_set_coloured/'):
+def get_other_templates(path='./assets/char_set_coloured/', patch_size=8):
     directory = os.listdir(path)
     num_temps = len(directory)
-    images = np.zeros((1, 8, 8, 3, num_temps))
+    images = np.zeros((1, patch_size, patch_size, 3, num_temps))
     for j in range(num_temps):
-        im = Image.open(path + directory[j]).resize((8, 8))
+        im = Image.open(path + directory[j])
         im = np.asarray(im, dtype='uint8')
         images[0, ..., j] = im[..., :3]
         # print(images.shape)
@@ -239,6 +247,8 @@ def process_emojis(num_temps=62):
         x += 1
 
 
+
+
     # im.show()
     # im = np.asarray(im, dtype='uint8')
     # print(im.shape)
@@ -257,6 +267,17 @@ def process_emojis(num_temps=62):
     #     images[0, :, :, :, j] = im
     # # return tf.convert_to_tensor(images,tf.float32)
     # return images
+def rgba_to_rgb(path):
+    directory = os.listdir(path)
+    print(directory)
+    print(len(directory))
+    for i in range(len(directory)):
+        im = Image.open(path + directory[i])
+        if np.asarray(im).shape[2] == 4:
+            print(im)
+            im = pure_pil_alpha_to_color_v2(im)
+            im.save(path + directory[i])
+
 
 def pure_pil_alpha_to_color_v2(image, color=(255, 255, 255)):
     """Alpha composite an RGBA Image with a specified color.

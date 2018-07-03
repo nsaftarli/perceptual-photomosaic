@@ -20,9 +20,9 @@ def ConvLayer(x, name, ksize=3, stride=1, layer_type='Decoder', out_channels=Non
         elif norm_type == 'instance':
             z = InstanceNorm(z)
         elif norm_type == 'group':
-            z = GroupNorm(z, G=1)
+            z = GroupNorm(z, G=2)
         elif norm_type == 'layer':
-            z = LayerNorm(z)
+            z = GroupNorm(z, G=1)
         ############################
 
         if layer_type == 'Softmax':

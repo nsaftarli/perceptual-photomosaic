@@ -14,6 +14,7 @@ from layers import LossLayer
 from utils import *
 import scipy.misc as misc
 from predictTop import *
+from PIL import Image
 
 '''Data constants'''
 const = constants.Constants()
@@ -29,9 +30,11 @@ text_cols = const.text_cols
 dims = const.char_count
 experiments_dir = const.experiments_dir
 coco_dir = const.coco_dir
-img_size = const.img_new_size
+img_orig_size = const.img_orig_size
 patch_size = const.patch_size
 num_patches = const.num_patches
+img_new_size = const.img_new_size
+batch_size = const.batch_size
 
 
 
@@ -43,12 +46,15 @@ argParser.add_argument('-u', '--update', dest='update', action='store', default=
 argParser.add_argument('-lr', '--learning-rate',  dest='lr', action='store', default=1e-6, type=float)
 argParser.add_argument('-db', '--debug', dest='debug', action='store', default=False, type=bool)
 argParser.add_argument('-t', '--temp', dest='temp',  action='store',  default=1.0,  type=float)
-argParser.add_argument('-val', '--val', dest='val',  action='store',  default=True,  type=bool)
+argParser.add_argument('-val', '--val', dest='val',  action='store',  default=False,  type=bool)
 argParser.add_argument('-c', '--ckpt', dest='ckpt', action='store', default=None)
 argParser.add_argument('-d', '--exp', dest='exp', action='store', default=None, type=str)
 argParser.add_argument('-rgb', '--colour', dest='rgb', action='store', default=False, type=str)
 argParser.add_argument('-tmp', '--templates', dest='tmp', action='store', default='other', type=str)
-argParser.add_argument('-v', '--video', dest='video', action='store', default=False, type=str)
+argParser.add_argument('-v', '--video', dest='video', action='store', default=True, type=str)
+argParser.add_argument('-folder', '--folder', dest='folder', action='store', default=None, type=str)
+argParser.add_argument('-b', '--batchsize', dest='batch_size', action='store', default=100, type=int)
+
 cmdArgs = argParser.parse_args()
 ##################################################
 
@@ -64,13 +70,14 @@ exp = cmdArgs.exp
 rgb = cmdArgs.rgb
 video = cmdArgs.video
 tmp = cmdArgs.tmp
+# batch_size = cmdArgs.batch_size
 
 
 #####File Handling###############################
 folder = experiments_dir + exp
 log_dir = folder + '/log/validation/'
 snapshot_dir = folder + '/snapshots/'
-im_dir = folder + '/images/validation/'
+im_dir = folder + '/images/validation_4/'
 
 if not os.path.exists(folder):
     raise ValueError("Experiment doesn't exist")
@@ -98,33 +105,46 @@ sess = tf.Session(config=config)
 
 ############Data Input######################
 if val:
-    dataset = tf.data.Dataset.from_generator(imdata.load_val_data_gen,  (tf.float32, tf.int32)).prefetch(48)
+    dataset = tf.data.Dataset.from_generator(imdata.load_val_data_gen,  (tf.float32, tf.int32)).prefetch(14)
 elif video:
-    dataset = tf.data.Dataset.from_generator(imdata.load_vid_data_gen, (tf.float32, tf.int32)).prefetch(48)
+    dataset = tf.data.Dataset.from_generator(imdata.load_vid_data_gen, (tf.float32, tf.int32)).prefetch(14)
 
 next_batch = dataset.make_one_shot_iterator().get_next()
 
 if tmp == 'ascii':
-    y = imdata.get_templates(path='./assets/char_set_alt/', num_temps=NUM_TEMPLATES)
+    y = imdata.get_other_templates(path='./assets/char_set_alt/')
+elif tmp == 'col_ascii':
+    y = imdata.get_other_templates(path='./assets/char_set_coloured_16/')
+elif tmp == 'flags':
+    y = imdata.get_other_templates(path='./assets/flag_temps_16/')
+elif tmp == 'faces':
+    y = imdata.get_templates(path='./assets/face_templates/', num_temps=NUM_TEMPLATES)
+elif tmp == 'emoji':
+    y = imdata.get_templates(path='./assets/emoji_temps_full_16/', temp_size=8, num_temps=NUM_TEMPLATES)
+elif tmp == 'stars':
+    y = imdata.get_other_templates(path='./assets/star_temps_2_16/')
 else:
-    y = imdata.get_templates(path='./assets/cam_templates/', num_temps=NUM_TEMPLATES)
+    print(cmdArgs.folder)
+    y = imdata.get_other_templates(path='./assets/' + cmdArgs.folder + '/', patch_size=16)
+
+print(y.shape)
+print('#########################')
 #############################################
 
 with tf.device('/gpu:'+str(0)):
-    input = tf.placeholder(tf.float32, shape=(6, img_size, img_size, 3))
-    # m = ASCIINet(images=input, templates=y, batch_size=1)
-    m = ASCIINet(images=input, templates=y, batch_size=6, trainable=False, rgb=rgb)
-    tLoss = m.tLoss
-    argmax = tf.one_hot(tf.argmax(m.softmax, axis=-1), depth=62)
-    o = predictTop(argmax, m.temps, batch_size=6, rgb=True, num_temps=62, img_size=img_size, softmax_size=m.softmax_size, patch_size=patch_size)
-    side_by_side = tf.concat([m.input, o], axis=2)
-merged = tf.summary.merge_all()
+    input = tf.placeholder(tf.float32, shape=(batch_size, 376, img_orig_size, 3))
+    m = ASCIINet(batch_size=batch_size,images=input, templates=y, rgb=rgb, inference=True)
+    # tLoss = m.tLoss
+    # opt, lr = optimize(tLoss)
+    argmax = tf.one_hot(tf.argmax(m.softmax, axis=-1), depth=NUM_TEMPLATES)
+    o = predictTop(argmax, m.temps, batch_size=batch_size, rgb=rgb, num_temps=NUM_TEMPLATES, img_size=img_new_size, patch_size=patch_size, softmax_h=m.softmax_h, softmax_w=m.softmax_w)
+    # side_by_side = tf.concat([m.input, o], axis=2)
 
 saver = tf.train.Saver()
 lrate = base_lr
 
 with sess:
-    saver.restore(sess, snapshot_dir + 'checkpoint.chkpt')
+    saver.restore(sess, snapshot_dir + 'checkpoint_4500.chkpt')
     writer = tf.summary.FileWriter(log_dir, sess.graph)
 
     n = 0
@@ -133,26 +153,31 @@ with sess:
         # print(x[1])
         feed_dict = {input: x,  m.temp: t}
 
-        summary = sess.run([merged, tLoss], feed_dict=feed_dict)
+        # if i % update == 0:
+        #     # misc.imsave(im_dir + str(n) + 'i.jpg', sess.run(m.input[1], feed_dict={input: x, m.temp: t}))
+        #     misc.imsave(im_dir + 'frame_%04d.png' % n, sess.run(o[1], feed_dict={input: x, m.temp: t}))
+        #     n += 1
+        #     # misc.imsave(im_dir + str(n) + 'i.jpg', sess.run(m.input[2], feed_dict={input: x, m.temp: t}))
+        #     misc.imsave(im_dir + 'frame_%04d.png' % n, sess.run(o[2], feed_dict={input: x, m.temp: t}))
+        #     n += 1
+        #     # misc.imsave(im_dir + str(n) + 'i.jpg', sess.run(m.input[3], feed_dict={input: x, m.temp: t}))
+        #     misc.imsave(im_dir + 'frame_%04d.png' % n, sess.run(o[3], feed_dict={input: x, m.temp: t}))
+        #     n += 1
+        #     # misc.imsave(im_dir + str(n) + 'i.jpg', sess.run(m.input[4], feed_dict={input: x, m.temp: t}))
+        #     misc.imsave(im_dir + 'frame_%04d.png' % n, sess.run(o[4], feed_dict={input: x, m.temp: t}))
+        #     n += 1
+        #     # misc.imsave(im_dir + str(n) + 'i.jpg', sess.run(m.input[5], feed_dict={input: x, m.temp: t}))
+        #     misc.imsave(im_dir + 'frame_%04d.png' % n, sess.run(o[5], feed_dict={input: x, m.temp: t}))
+        #     n += 1
+        #     # misc.imsave(im_dir + str(n) + 'i.jpg', sess.run(m.input[0], feed_dict={input: x, m.temp: t}))
+        #     misc.imsave(im_dir + 'frame_%04d.png' % n, sess.run(o[0], feed_dict={input: x, m.temp: t}))
+        #     n += 1
 
         if i % update == 0:
-            # misc.imsave(im_dir + str(n) + 'i.jpg', sess.run(m.input[1], feed_dict={input: x, m.temp: t}))
-            misc.imsave(im_dir + str(n) + 'o.png', sess.run(side_by_side[1], feed_dict={input: x, m.temp: t}))
-            n += 1
-            # misc.imsave(im_dir + str(n) + 'i.jpg', sess.run(m.input[2], feed_dict={input: x, m.temp: t}))
-            misc.imsave(im_dir + str(n) + 'o.png', sess.run(side_by_side[2], feed_dict={input: x, m.temp: t}))
-            n += 1
-            # misc.imsave(im_dir + str(n) + 'i.jpg', sess.run(m.input[3], feed_dict={input: x, m.temp: t}))
-            misc.imsave(im_dir + str(n) + 'o.png', sess.run(side_by_side[3], feed_dict={input: x, m.temp: t}))
-            n += 1
-            # misc.imsave(im_dir + str(n) + 'i.jpg', sess.run(m.input[4], feed_dict={input: x, m.temp: t}))
-            misc.imsave(im_dir + str(n) + 'o.png', sess.run(side_by_side[4], feed_dict={input: x, m.temp: t}))
-            n += 1
-            # misc.imsave(im_dir + str(n) + 'i.jpg', sess.run(m.input[5], feed_dict={input: x, m.temp: t}))
-            misc.imsave(im_dir + str(n) + 'o.png', sess.run(side_by_side[5], feed_dict={input: x, m.temp: t}))
-            n += 1
-            # misc.imsave(im_dir + str(n) + 'i.jpg', sess.run(m.input[0], feed_dict={input: x, m.temp: t}))
-            misc.imsave(im_dir + str(n) + 'o.png', sess.run(side_by_side[0], feed_dict={input: x, m.temp: t}))
-            n += 1
+            nth_batch = sess.run(o, feed_dict={input: x, m.temp: t})
+            for n in range(1,batch_size):
+                misc.imsave(im_dir + 'frame_%04d.png' % ((i*batch_size) + n), nth_batch[n])
+            misc.imsave(im_dir + 'frame_%04d.png' % ((i*batch_size) + n + 1), nth_batch[0])
+    
 
     print("Model restored")

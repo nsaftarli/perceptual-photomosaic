@@ -43,16 +43,16 @@ def predictTop(argmax, templates, patch_size=8, batch_size=1, rgb=False, num_tem
             o_r = tf.matmul(reshaped_argmax, r)
             o_r = tf.reshape(tf.transpose(tf.reshape(
                 o_r, [batch_size, softmax_h, softmax_w, patch_size, patch_size]),
-                perm=[0, 1, 3, 2, 4]), [batch_size, 376, img_size, 1])
+                perm=[0, 1, 3, 2, 4]), [batch_size, 376 * 2, img_size * 2, 1])
 
             o_g = tf.matmul(reshaped_argmax, g)
             o_g = tf.reshape(tf.transpose(tf.reshape(
                 o_g, [batch_size, softmax_h, softmax_w, patch_size, patch_size]),
-                perm=[0, 1, 3, 2, 4]), [batch_size, 376, img_size, 1])
+                perm=[0, 1, 3, 2, 4]), [batch_size, 376 * 2, img_size * 2, 1])
 
             o_b = tf.matmul(reshaped_argmax, b)
             o_b = tf.reshape(tf.transpose(tf.reshape(
                 o_b, [batch_size, softmax_h, softmax_w, patch_size, patch_size]),
-                perm=[0, 1, 3, 2, 4]), [batch_size, 376, img_size, 1])
+                perm=[0, 1, 3, 2, 4]), [batch_size, 376 * 2, img_size * 2, 1])
 
             return tf.concat([o_r, o_g, o_b], axis=3)

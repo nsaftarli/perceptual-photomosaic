@@ -37,9 +37,6 @@ img_new_size = const.img_new_size
 
 
 
-
-
-
 ####Command line arguments#######################
 argParser = argparse.ArgumentParser(description='training')
 argParser.add_argument('-g', '--gpu', dest="gpu", action="store", default=1, type=int)
@@ -55,6 +52,7 @@ argParser.add_argument('-v', '--video', dest='vid', action='store', default=Fals
 argParser.add_argument('-logf', '--logfreq', dest='logf', action='store', default=10, type=int)
 argParser.add_argument('-savef', '--savefreq', dest='savef', action='store', default=500, type=int)
 argParser.add_argument('-chkpt', '-chkptfreq', dest='chkpt', action='store', default=500, type=int)
+argParser.add_argument('-folder', '--folder', dest='folder', action='store', default=None, type=str)
 cmdArgs = argParser.parse_args()
 ##################################################
 
@@ -73,6 +71,7 @@ logfreq = cmdArgs.logf
 savefreq = cmdArgs.savef
 chkptfreq = cmdArgs.chkpt
 NUM_TEMPLATES = const.num_templates
+folder = cmdArgs.folder
 
 
 #####File Handling###############################
@@ -129,7 +128,9 @@ elif tmp == 'emoji':
 elif tmp == 'stars':
     y = imdata.get_other_templates(path='./assets/star_temps_2_8/')
 else:
-    y = imdata.get_templates(path='./assets/cam_templates/', num_temps=NUM_TEMPLATES)
+    print(cmdArgs.folder)
+    y = imdata.get_other_templates(path='./assets/' + cmdArgs.folder + '/')
+    # y = imdata.get_templates(path='./assets/cam_templates/', num_temps=NUM_TEMPLATES)
 #########################################
 
 
