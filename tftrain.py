@@ -135,7 +135,7 @@ else:
 
 
 ############Pebbles Test#####################
-# x = imdata.get_pebbles(path='./pebbles.jpg')
+# x = imdata.get_pebbles(path='./assets/pebbles.jpg')
 # x = tf.convert_to_tensor(x, tf.float32)
 #############################################
 
@@ -195,9 +195,9 @@ with sess:
             print('Experiment directory: ', experiments_dir)
             print('Save directory: ', snapshot_dir)
             print('Log directory: ', log_dir)
-            misc.imsave(im_dir + str(i) + 'i.jpg', sess.run(m.input[1], feed_dict={input: x, m.temp: t}))
-            misc.imsave(im_dir + str(i) + 's.jpg', sess.run(m.view_output[1], feed_dict={input: x, m.temp: t}))
-            misc.imsave(im_dir + str(i) + 'o.jpg', sess.run(o[1], feed_dict={input: x, m.temp: t}))
+            misc.imsave(im_dir + str(i) + 'i.png', sess.run(m.input[1], feed_dict={input: x, m.temp: t}))
+            misc.imsave(im_dir + str(i) + 's.png', sess.run(m.view_output[1], feed_dict={input: x, m.temp: t}))
+            misc.imsave(im_dir + str(i) + 'o.png', sess.run(o[1], feed_dict={input: x, m.temp: t}))
 
 
         if i % logfreq == 0:
