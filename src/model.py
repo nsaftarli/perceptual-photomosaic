@@ -195,6 +195,7 @@ class MosaicNet:
     # TODO: Implement
     def predict(self):
         pass
+        
     def optimize(self, loss):
         lr = tf.placeholder(tf.float32,shape=[])
         opt = tf.train.GradientDescentOptimizer(learning_rate=lr).minimize(loss)
