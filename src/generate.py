@@ -16,7 +16,7 @@ import scipy.misc as misc
 
 
 ######################## DATA ####################
-const = constants.Constants()
+const = Constants()
 img_data_dir = const.img_data_dir
 ascii_data_dir = const.ascii_data_dir
 val_data_dir = const.val_data_dir
