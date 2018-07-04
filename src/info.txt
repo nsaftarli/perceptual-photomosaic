@@ -1,0 +1,6 @@
+run
+Hyperparameters
+# Iterations: 1
+Snapshot Freq: 100
+Learning Rate: 1e-06
+Initial Temperature: 1.0

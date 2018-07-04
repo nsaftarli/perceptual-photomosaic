@@ -7,12 +7,12 @@ import argparse
 import tensorflow as tf
 import numpy as np
 import imdata
-from tfmodel import *
-from tfoptimizer import *
+from model import *
+# from tfoptimizer import *
 from layers import LossLayer
 from utils import *
 import scipy.misc as misc
-from predictTop import *
+# from predictTop import *
 
 
 ######################## DATA ####################
@@ -54,7 +54,7 @@ parser.add_argument('-v', '--video', default=False, type=bool)
 parser.add_argument('-logf', '--log_freq', default=10, type=int)
 parser.add_argument('-savef', '--save_freq', default=500, type=int)
 parser.add_argument('-chkpt', '--chkpt_freq', default=500, type=int)
-parser.add_argument('-folder', '--template_folder', default=None, type=str)
+parser.add_argument('-folder', '--template_folder', default='char_set_alt', type=str)
 parser.add_argument('-id', '--runid', default='run', type=str)
 args = parser.parse_args()
 
@@ -85,11 +85,11 @@ t = args.temperature
 notes = args.notes
 # dset = args.dset
 # rgb = args.rgb
-tmp = args.tmp
-vid = args.vid
-logfreq = args.logf
-savefreq = args.savef
-chkptfreq = args.chkpt
+# tmp = args.tmp
+# vid = args.vid
+logfreq = args.log_freq
+savefreq = args.save_freq
+chkptfreq = args.chkpt_freq
 template_folder = args.template_folder
 runid = args.runid
 NUM_TEMPLATES = const.num_templates
@@ -114,14 +114,16 @@ log_dir = '../logs/' + filename
 snapshot_dir = '../snapshots/' + filename
 im_dir = '../images/' + filename
 notes_dir = '../notes/' + filename
+print(notes_dir)
 
 # if not os.path.exists(folder):
     # os.makedirs(folder)
 os.makedirs(log_dir)
 os.makedirs(snapshot_dir)
 os.makedirs(im_dir)
+os.makedirs(notes_dir)
 
-with open(notes_dir + '/info.txt', 'w') as fp:
+with open(notes_dir + 'info.txt', 'w') as fp:
     fp.write(runid + '\n')
     fp.write('Hyperparameters' + '\n')
     fp.write('# Iterations: ' + str(iterations) + '\n')
@@ -145,23 +147,7 @@ else:
         (tf.float32, tf.int32)).prefetch(12)
 next_batch = dataset.make_one_shot_iterator().get_next()
 
-# if tmp == 'ascii':
-#     y = imdata.get_other_templates(path='./assets/char_set_alt/')
-# elif tmp == 'col_ascii':
-#     y = imdata.get_other_templates(path='./assets/char_set_coloured_8/')
-# elif tmp == 'flags':
-#     y = imdata.get_other_templates(path='./assets/flag_temps_8/')
-# elif tmp == 'faces':
-#     y = imdata.get_templates(path='./assets/face_templates/', num_temps=NUM_TEMPLATES)
-# elif tmp == 'emoji':
-#     y = imdata.get_templates(path='./assets/emoji_temps_full_8/', temp_size=8, num_temps=NUM_TEMPLATES)
-# elif tmp == 'stars':
-#     y = imdata.get_other_templates(path='./assets/star_temps_2_8/')
-# else:
-#     print(args.folder)
-#     y = imdata.get_other_templates(path='./assets/' + args.folder + '/')
-
-y = imdata.get_templates(path='./assets/' + template_folder + '/')
+y = imdata.get_templates(path='../data/' + template_folder + '/')
 
 ############Pebbles Test#####################
 # x = imdata.get_pebbles(path='./assets/pebbles.jpg')
@@ -178,7 +164,11 @@ y = imdata.get_templates(path='./assets/' + template_folder + '/')
 #     argmax = tf.one_hot(tf.argmax(m.softmax, axis=-1), depth=NUM_TEMPLATES)
 #     o = predictTop(argmax, m.temps, batch_size=6, rgb=rgb, num_temps=NUM_TEMPLATES, img_size=img_new_size, patch_size=patch_size, softmax_h=m.softmax_h, softmax_w=m.softmax_w)
 # merged = tf.summary.merge_all()
-m = MosaicNet(config=config, my_config=my_config)
+with tf.device('/gpu:' + str(0)):
+    m = MosaicNet(y, config=config, my_config=my_config)
+    tLoss = m.tLoss
+    opt, lr = optimize(tLoss)
+print('Num Variables: ', np.sum([np.product([xi.value for xi in x.get_shape()]) for x in tf.all_variables()]))
 ############################################
 
 
@@ -186,7 +176,6 @@ m = MosaicNet(config=config, my_config=my_config)
 ############Training################################
 chkpt = tf.train.Saver()
 lrate = base_lr
-print('Num Variables: ', np.sum([np.product([xi.value for xi in x.get_shape()]) for x in tf.all_variables()]))
 
 with sess:
     sess.run(tf.global_variables_initializer())

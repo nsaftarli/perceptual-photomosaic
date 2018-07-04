@@ -42,3 +42,8 @@ experiments/
 constants.py
 
 ._*
+.DS_Store
+
+data/
+notes/
+
