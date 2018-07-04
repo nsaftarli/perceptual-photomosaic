@@ -138,6 +138,7 @@ class MosaicNet:
                 self.vgg_out_d1 = VGG16(input=self.out_d1, trainable=False)
                 self.vgg_out_d2 = VGG16(input=self.out_d2, trainable=False)
 
+
             ################Structure Loss############################################################################
             self.f_loss1 = tf.losses.mean_squared_error(self.encoder.conv1_1, self.vgg2.conv1_1)
             self.f_loss2 = tf.losses.mean_squared_error(self.encoder.conv2_1, self.vgg2.conv2_1)
