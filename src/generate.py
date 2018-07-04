@@ -192,7 +192,7 @@ with sess:
 
 
         feed_dict = {
-                        input: x,
+                        m.input: x,
                         lr: lrate,
                         m.temp: t
                      }
