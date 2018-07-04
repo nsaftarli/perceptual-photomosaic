@@ -4,11 +4,7 @@ sys.path.append('utils/')
 import os
 import numpy as np
 from PIL import Image
-# import matplotlib.mlab as mlab
-# import matplotlib.pyplot as plt
-# from constants import Constants
 from utils.constants import Constants
-import tensorflow as tf
 import itertools
 
 
@@ -247,26 +243,6 @@ def process_emojis(num_temps=62):
         x += 1
 
 
-
-
-    # im.show()
-    # im = np.asarray(im, dtype='uint8')
-    # print(im.shape)
-    # im.show()
-    # # im = im.convert('RGB')
-    # # im.show()
-    # im2 = pure_pil_alpha_to_color_v2(im)
-    # im2.show()
-
-    # for j in range(num_temps):
-    #     # im = Image.open(path + str(j) + '.png').convert('L')
-    #     # images[0,:,:,j] = np.asarray(im,dtype='uint8')
-    #     im = Image.open(path + str(j) + '.png')
-    #     im = np.asarray(im, dtype='uint8')
-    #     # images[0, :, :, j] = np.mean(im, axis=-1)
-    #     images[0, :, :, :, j] = im
-    # # return tf.convert_to_tensor(images,tf.float32)
-    # return images
 def rgba_to_rgb(path):
     directory = os.listdir(path)
     print(directory)
@@ -301,26 +277,9 @@ def get_pebbles(path='./pebbles.jpg'):
     edges = np.zeros((224, 224, 3), dtype='uint8')
     img = Image.open(path).resize((224, 224))
     img_arr = np.asarray(img)
-    # r = img_arr[:,:,0]
-    # g = img_arr[:,:,1]
-    # b = img_arr[:,:,2]
 
-    # r_edges = feature.canny(r,sigma=3)
-    # g_edges = feature.canny(g,sigma=3)
-    # b_edges = feature.canny(b,sigma=3)
-
-    # edges[...,0] = r_edges * 255
-    # edges[...,1] = g_edges * 255
-    # edges[...,2] = b_edges * 255
-
-    # # edges = np.concatenate([r_edges,g_edges,b_edges],axis=-1)
-    # print(edges.dtype)
-    # print(np.asarray(img).reshape((-1,224,224,3)).dtype)
-    # print('AAAAAAAAAAAAAAa')
-    # rescaled = np.asarray(Image.fromarray(edges))
     return img_arr.reshape((-1, 224, 224, 3))
-    # return np.asarray(Image.fromarray(edges)).reshape((-1,224,224,3))
-    # return np.asarray(img).reshape((-1,224,224,3))
+
 
 
 def create_char_img(path='./assets/char_set/0.png'):
