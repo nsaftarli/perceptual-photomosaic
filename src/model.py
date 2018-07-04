@@ -56,7 +56,7 @@ class MosaicNet:
 
         input_shape = tf.shape(self.input)
         batch_size, input_height, input_width, input_channels = [input_shape[0], input_shape[1], input_shape[2], input_shape[3]]
-        
+
         print(batch_size)
         _, template_h, template_w, template_channels, num_templates = templates.shape
         # ################ Get Templates #############################################################################
@@ -187,8 +187,17 @@ class MosaicNet:
             return tf.concat([r, g, b], axis=3)
 
 
+    # TODO: Implement
+    def train(self):
+        pass
 
-
+    # TODO: Implement
+    def predict(self):
+        pass
+    def optimize(self, loss):
+        lr = tf.placeholder(tf.float32,shape=[])
+        opt = tf.train.GradientDescentOptimizer(learning_rate=lr).minimize(loss)
+        return opt, lr
 
 
     def print_architecture(self):
@@ -221,7 +230,3 @@ class MosaicNet:
         print(self.softmax.get_shape())
         print(self.flat_softmax.get_shape())
         print(tf.trainable_variables())
-
-
-if __name__ == '__main__':
-    m = ASCIINet()
