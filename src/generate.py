@@ -153,7 +153,9 @@ y = imdata.get_templates(path='../data/' + template_folder + '/')
 # x = imdata.get_pebbles(path='./assets/pebbles.jpg')
 # x = tf.convert_to_tensor(x, tf.float32)
 #############################################
-
+sess = tf.Session(config=config)
+x, ind = sess.run(next_batch)
+print(x)
 
 ##############Build Graph###################
 # with tf.device('/gpu:'+str(0)):

@@ -56,8 +56,7 @@ class MosaicNet:
 
         input_shape = tf.shape(self.input)
         batch_size, input_height, input_width, input_channels = [input_shape[0], input_shape[1], input_shape[2], input_shape[3]]
-        print(batch_size)
-
+        
         print(batch_size)
         _, template_h, template_w, template_channels, num_templates = templates.shape
         # ################ Get Templates #############################################################################
