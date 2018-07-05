@@ -135,14 +135,6 @@ def load_vid_data_gen(num_batches=100,
     while True:
         x = np.zeros((batch_size, img_rows, img_cols, 3), dtype='uint8')
 
-        # for i in itertools.count(ind, 1):
-        #     if ind == 700:
-        #         ind = 0
-        #         n = 0
-        #         break
-        #     imgpath = video_dir + str() + 
-
-
         for i in itertools.count(ind, 1):
             if i == 5654:
                 ind = 0
@@ -163,24 +155,6 @@ def load_vid_data_gen(num_batches=100,
             if i == ind + batch_size:
                 ind += batch_size
                 yield x,i+1
-
-# def load_vid_data_val(num_batches=100,
-#                       batch_size=6,
-#                       img_rows=376,
-#                       img_cols=512):
-    
-
-
-def load_data_static(num=10000, img_rows=512, img_cols=512):
-        x = np.zeros((num, img_rows, img_cols, 3), dtype='uint8')
-
-        for i in range(num):
-            imgpath = img_data_dir + 'in_' + str(i) + '.jpg'
-            img = Image.open(imgpath)
-            x[i, :, :, :] = np.asarray(img, dtype='uint8')
-
-        return x
-
 
 def get_templates(path='./assets/char_set/', temp_size=8, num_temps=16, rgb=True):
 
@@ -289,17 +263,7 @@ def create_char_img(path='./assets/char_set/0.png'):
         for j in range(28):
             tiles[i:2*i-1, j:2*j-1, :] = im
 
-
-def overlay_img(path='./'):
-    out = np.zeros((224,224,3), dtype='uint8')
-    img = np.asarray(Image.open(path + 'kosta.jpg').resize((224, 224)))
-    txt = np.asarray(Image.open(path + 'snapshots/a/img3.jpg'))
-    out = 0.3 * img + 0.7 * txt
-    im_out = Image.fromarray(out.astype('uint8'))
-    im_out.show()
-
-
-def make_template_ims(path='./assets/temp_pics/',temp_size=8):
+def make_template_ims(path='./assets/temp_pics/',temp_size=8, num_temps=62):
     imgpath = path + 'a.jpg'
     # print(Image.)
     im = np.asarray(Image.open(imgpath).resize((287, 224)))
@@ -308,17 +272,8 @@ def make_template_ims(path='./assets/temp_pics/',temp_size=8):
     h = im.shape[0]
     w = im.shape[1]
     n = 0
-    # for i in range(w // temp_size):
-    #     for j in range(h // temp_size):
-    #         y = np.random.randint(0, 224)
-    #         x = np.random.randint(0, 224)
-    #         template = im[j*temp_size:(j+1)*temp_size, i*temp_size:(i+1)*temp_size, :]
-    #         out = Image.fromarray(template.astype('uint8'))
-    #         # break
-    #         out.save('./assets/cam_templates/' + str(n), 'JPEG')
-    #         n += 1
 
-    for i in range(62):
+    for i in range(num_temps):
         y = np.random.randint(0, 196)
         x = np.random.randint(0, 264)
 
@@ -327,8 +282,7 @@ def make_template_ims(path='./assets/temp_pics/',temp_size=8):
         out.save('./assets/cam_templates/' + str(n) + '.png', 'PNG')
         n += 1
 
-        # break
-    # out.show()
+
 def turn_im_into_templates(path='./assets/temp_pics/', temp_size=8):
     imgpath = path + 'picasso-femmes-d-alger.jpg'
     im = np.asarray(Image.open(imgpath).resize((288, 224)))
@@ -340,8 +294,8 @@ def turn_im_into_templates(path='./assets/temp_pics/', temp_size=8):
             out.save('./assets/cam_templates_2/' + str(x) + '.png', 'PNG')
             x += 1
 
-def make_face_templates(path='./assets/rgb_in/img_celeba/'):
-    for i in range(62):
+def make_face_templates(path='./assets/rgb_in/img_celeba/', num_temps=62):
+    for i in range(num_temps):
         n = np.random.randint(0,202598)
         imgpath = path + 'in_' + str(n) + '.jpg'
         im = np.asarray(Image.open(imgpath).resize((8, 8)))
@@ -349,27 +303,17 @@ def make_face_templates(path='./assets/rgb_in/img_celeba/'):
         out.save('./assets/face_templates/' + str(i), 'JPEG')
 
 
-
-def check_coco():
-    for im in os.listdir('/home/nsaftarl/ASCIIArtNN/assets/coco-set/train2014/'):
-        # print(Image.open(im).size)
-        print(np.asarray(Image.open('/home/nsaftarl/ASCIIArtNN/assets/coco-set/train2014/' + im)).shape)
-
-def clean_coco():
+def clean_dataset(path='../data/coco-resized-512/'):
     path = '/home/nsaftarl/ASCIIArtNN/assets/coco-set/train2014/'
     for im in os.listdir(path):
-        # print(len(np.asarray(Image.open(path + im)).shape))
         if len(np.asarray(Image.open(path + im)).shape) != 3:
             os.remove(path + im)
 
 
-def resize_coco():
-    in_path = '/home/nsaftarl/ASCIIArtNN/assets/coco-set/train2014/'
-    out_path = '/home/nsaftarl/ASCIIArtNN/assets/coco-resized-512/'
-
+def resize_dataset(in_path = '/home/nsaftarl/ASCIIArtNN/assets/coco-set/train2014/',
+                   out_path = '/home/nsaftarl/ASCIIArtNN/assets/coco-resized-512/'):
     if not os.path.exists(out_path):
         os.makedirs(out_path)
-
     for im in os.listdir('/home/nsaftarl/ASCIIArtNN/assets/coco-set/train2014/'):
         img = np.asarray(Image.open(in_path + im).resize((512, 512), resample=Image.BILINEAR), dtype='uint8')
         img = Image.fromarray(img)
@@ -377,9 +321,8 @@ def resize_coco():
 
 
 
-def resize_movie():
-    in_path = '/home/nsaftarl/ASCIIArtNN/assets/mv/'
-    out_path = '/home/nsaftarl/ASCIIArtNN/assets/mv-resized-512/'
+def resize_movie(in_path = '/home/nsaftarl/ASCIIArtNN/assets/mv/',
+                 out_path = '/home/nsaftarl/ASCIIArtNN/assets/mv-resized-512/'):
 
     if not os.path.exists(out_path):
         os.makedirs(out_path)
