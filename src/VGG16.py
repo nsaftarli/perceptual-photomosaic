@@ -10,7 +10,7 @@ VGG_MEAN = [103.939, 116.779, 123.68]
 
 
 class VGG16:
-    def __init__(self, input, weight_path='../weights/vgg16.npy', trainable=False):
+    def __init__(self, input, weight_path='../data/models/vgg16.npy', trainable=False):
         self.vgg_weights = np.load(weight_path, encoding='latin1').item()
         self.vgg = self.build_vgg(input, trainable=trainable)
 
