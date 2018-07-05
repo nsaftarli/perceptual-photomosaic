@@ -1,6 +1,4 @@
 import sys
-# sys.path.append('layers/')
-# sys.path.append('utils/')
 import os
 import time
 import argparse
@@ -8,33 +6,10 @@ import tensorflow as tf
 import numpy as np
 import imdata
 from model import *
-# from tfoptimizer import *
 from layers import LossLayer
 from utils import *
 import scipy.misc as misc
-# from predictTop import *
 
-
-######################## DATA ####################
-const = Constants()
-img_data_dir = const.img_data_dir
-ascii_data_dir = const.ascii_data_dir
-val_data_dir = const.val_data_dir
-char_array = const.char_array
-char_dict = const.char_dict
-img_rows = const.img_rows
-img_cols = const.img_cols
-text_rows = const.text_rows
-text_cols = const.text_cols
-dims = const.char_count
-experiments_dir = const.experiments_dir
-coco_dir = const.coco_dir
-img_orig_size = const.img_orig_size
-patch_size = const.patch_size
-num_patches = const.num_patches
-img_new_size = const.img_new_size
-
-####################################################
 
 
 # COMMAND LINE ARGS
@@ -43,19 +18,14 @@ parser.add_argument('-g', '--gpu', default=1, type=int)
 parser.add_argument('-b', '--batch_size', default=1, type=int)
 parser.add_argument('-i', '--iterations', default=1, type=int)
 parser.add_argument('-tr', '--train', default=True, type=bool)
-parser.add_argument('-u', '--update', default=100, type=int)
 parser.add_argument('-lr', '--learning_rate', default=1e-6, type=float)
-parser.add_argument('-t', '--temperature', default=1.0, type=float)
+parser.add_argument('-t', '--init_temperature', default=1.0, type=float)
 parser.add_argument('-n', '--notes', default=None, type=str)
-parser.add_argument('-d', '--dataset', default='Faces', type=str)
-parser.add_argument('-rgb', '--colour', default=False, type=bool)
-parser.add_argument('-tmp', '--templates', default='other', type=str)
-parser.add_argument('-v', '--video', default=False, type=bool)
 parser.add_argument('-logf', '--log_freq', default=10, type=int)
 parser.add_argument('-savef', '--save_freq', default=500, type=int)
 parser.add_argument('-chkpt', '--chkpt_freq', default=500, type=int)
-parser.add_argument('-folder', '--template_folder', default='char_set_alt', type=str)
-parser.add_argument('-id', '--runid', default='run', type=str)
+parser.add_argument('-folder', '--template_folder', default='black_ascii_8', type=str)
+parser.add_argument('-id', '--run_id', default='run', type=str)
 args = parser.parse_args()
 
 
@@ -66,20 +36,19 @@ my_config['batch_size'] = args.batch_size
 my_config['iterations'] = args.iterations
 my_config['train'] = args.train
 my_config['learning_rate'] = args.learning_rate
-my_config['temperature'] = args.temperature
+my_config['init_temperature'] = args.temperature
 my_config['notes'] = args.notes
 my_config['template_folder'] = args.template_folder
 my_config['chkpt_freq'] = args.chkpt_freq
 my_config['save_freq'] = args.save_freq
 my_config['log_freq'] = args.log_freq
-my_config['runid'] = args.runid
+my_config['run_id'] = args.runid
 
 
 
 gpu = args.gpu
 iterations = args.iterations
 train = args.train
-update = args.update
 base_lr = args.learning_rate
 t = args.temperature
 notes = args.notes
