@@ -14,7 +14,7 @@ class Dataset:
         files = sorted(os.listdir(self.path))
         num_files = len(files)
         for i in itertools.count(1):
-            img = imread(files[i % num_files], mode='RGB').astype('float32')
+            img = imread(self.path + files[i % num_files], mode='RGB').astype('float32')
             yield img, i
 
 
@@ -25,7 +25,7 @@ def get_templates(path):
     for i in range(num_templates):
         im = imread(path + files[i], mode='RGB').astype('float32')
         images.append(im)
-    images = np.stack(images)
+    images = np.expand_dims(np.stack(images, axis=-1), axis=0)
     return images
 
 

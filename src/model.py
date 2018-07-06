@@ -1,8 +1,8 @@
 import tensorflow as tf
 import numpy as np
-from layers import *
-from utils import *
-from VGG16 import *
+from src.layers import *
+from src.utils import *
+from src.VGG16 import *
 
 
 class MosaicNet:
@@ -20,9 +20,10 @@ class MosaicNet:
         print('Num Variables: ', np.sum([np.product([xi.value for xi in x.get_shape()]) for x in tf.all_variables()]))
 
     def build_graph(self):
+        trainable = self.my_config['train']
 
         # GRAPH INPUTS
-        with tf.name_scope('Graph Inputs'):
+        with tf.name_scope('Graph_Inputs'):
             self.temperature = tf.placeholder(tf.float32, shape=[])
             self.learning_rate = tf.placeholder(tf.float32, shape=[])
             self.next_batch = self.dataset.make_one_shot_iterator().get_next()
@@ -30,7 +31,7 @@ class MosaicNet:
             self.index = self.next_batch[1]
 
         self.batch_size = tf.shape(self.input)[0]
-        templates_shape = tf.shape(self.templates)
+        templates_shape = self.templates.get_shape().as_list()
         self.template_h, self.template_w, self.num_templates = \
             [templates_shape[1], templates_shape[2], templates_shape[4]]
 
@@ -41,16 +42,16 @@ class MosaicNet:
 
         # DECODER
         with tf.name_scope('Decoder'):
-            self.conv6 = ConvLayer(self.decoder_in, 'conv6', 4096, 1, trainable)
-            self.conv7 = ConvLayer(self.conv6, 'conv7', 1024, 1, trainable)
-            self.conv8 = ConvLayer(self.conv7, 'conv8', 512, 1, trainable)
-            self.conv9 = ConvLayer(self.conv8, 'conv9', 256, 1, trainable)
-            self.conv10 = ConvLayer(self.conv9, 'conv10', 128, 1, trainable)
-            self.conv11 = ConvLayer(self.conv10, 'conv11', 64, 1, trainable)
-            self.conv12 = ConvLayer(self.conv11, 'conv12', self.num_templates, 1, trainable, activation=None)
+            self.conv6 = ConvLayer(self.decoder_in, 'conv6', 4096, 1, trainable=trainable)
+            self.conv7 = ConvLayer(self.conv6, 'conv7', 1024, 1, trainable=trainable)
+            self.conv8 = ConvLayer(self.conv7, 'conv8', 512, 1, trainable=trainable)
+            self.conv9 = ConvLayer(self.conv8, 'conv9', 256, 1, trainable=trainable)
+            self.conv10 = ConvLayer(self.conv9, 'conv10', 128, 1, trainable=trainable)
+            self.conv11 = ConvLayer(self.conv10, 'conv11', 64, 1, trainable=trainable)
+            self.conv12 = ConvLayer(self.conv11, 'conv12', self.num_templates, 1, activation=None, trainable=trainable)
 
         # Computing template coefficients
-        with tf.name_scope('Coefficient Calculation'):
+        with tf.name_scope('Coefficient_Calculation'):
             # (B, H/H_T, W/W_T, N_T)
             self.softmax = tf.nn.softmax(self.conv12 * self.temperature)
             softmax_shape = tf.shape(self.softmax)
@@ -61,7 +62,7 @@ class MosaicNet:
                            [-1, self.softmax_h * self.softmax_w, self.num_templates])
 
         # TEMPLATE MODIFICATIONS
-        with tf.name_scope('Template Modifications'):
+        with tf.name_scope('Template_Modifications'):
             self.template_r, self.template_g, self.template_b = tf.unstack(self.templates, axis=3)
 
             # Unstacked templates are reshaped and tiled to (B, N_T, H_T * W_T)
@@ -75,18 +76,18 @@ class MosaicNet:
             self.template_b = tf.tile(self.template_b, [self.batch_size, 1, 1])
 
         # Constructing argmax output, channel-wise
-        with tf.name_scope('Hard Output'):
+        with tf.name_scope('Hard_Output'):
             self.reshaped_argmax = tf.argmax(self.reshaped_softmax, axis=-1)
             self.reshaped_argmax = tf.one_hot(self.reshaped_argmax, self.num_templates)
-            self.hard_output = self.construct_output('Channel-wise Soft Output',
+            self.hard_output = self.construct_output('Channel-wise_Soft_Output',
                                                      self.reshaped_argmax)
 
         if self.my_config['train']:
             # Constructing softmax output, channel-wise
-            with tf.name_scope('Soft Output'):
-                self.soft_output = self.construct_output('Channel-wise Soft Output',
+            with tf.name_scope('Soft_Output'):
+                self.soft_output = self.construct_output('Channel-wise_Soft_Output',
                                                          self.reshaped_softmax)
-            with tf.name_scope('Perceptual Loss'):
+            with tf.name_scope('Perceptual_Loss'):
                 self.loss = self.perceptual_loss(self.input, self.soft_output)
 
     def construct_output(self, name, coefficients):
@@ -111,35 +112,32 @@ class MosaicNet:
             return tf.concat([self.output_r, self.output_g, self.output_b], axis=3)
 
     def perceptual_loss(self, target, predicted):
-        with tf.name_scope('Blurred Predicted'):
-            blurred_predicted = GaussianBlurLayer(predicted)
-            self.blurred_predicted = blurred_predicted
+        with tf.name_scope('Blurred_Predicted'):
+            self.blurred_predicted = GaussianBlurLayer(predicted, 'Blurred_Predicted',
+                                                       self.template_h, self.template_w)
 
         # Gaussian Pyramid
-        with tf.name_scope('Gaussian Pyramid'):
-            target_downsampled_x2 = GaussianBlurLayer(target, 2)
-            self.target_downsampled_x2 = target_downsampled_x2
-
-            target_downsampled_x4 = GaussianBlurLayer(target_downsampled_x2, 2)
-            self.target_downsampled_x4 = target_downsampled_x4
-
-            predicted_downsampled_x2 = GaussianBlurLayer(predicted, 2)
-            self.predicted_downsampled_x2 = predicted_downsampled_x2
-
-            predicted_downsampled_x4 = GaussianBlurLayer(predicted_downsampled_x2, 2)
-            self.predicted_downsampled_x4 = predicted_downsampled_x4
+        with tf.name_scope('Gaussian_Pyramid'):
+            self.target_downsampled_x2 = GaussianBlurLayer(target, 'Target_Downsampled_x2',
+                                                      self.template_h, self.template_w, 2)
+            self.target_downsampled_x4 = GaussianBlurLayer(self.target_downsampled_x2, 'Target_Downsampled_x4',
+                                                      self.template_h, self.template_w, 2)
+            self.predicted_downsampled_x2 = GaussianBlurLayer(predicted, 'Predicted_Downsampled_x2',
+                                                         self.template_h, self.template_w, 2)
+            self.predicted_downsampled_x4 = GaussianBlurLayer(self.predicted_downsampled_x2, 'Predicted_Downsampled_x4',
+                                                         self.template_h, self.template_w, 2)
 
         # Get image features
         target_feats = self.encoder
-        target_downsampled_x2_feats = VGG16(input=target_downsampled_x2)
-        target_downsampled_x4_feats = VGG16(input=target_downsampled_x4)
-        blurred_predicted_feats = VGG16(input=blurred_predicted)
-        predicted_downsampled_x2_feats = VGG16(input=predicted_downsampled_x2)
-        predicted_downsampled_x4_feats = VGG16(input=predicted_downsampled_x4)
+        target_downsampled_x2_feats = VGG16(input=self.target_downsampled_x2)
+        target_downsampled_x4_feats = VGG16(input=self.target_downsampled_x4)
+        blurred_predicted_feats = VGG16(input=self.blurred_predicted)
+        predicted_downsampled_x2_feats = VGG16(input=self.predicted_downsampled_x2)
+        predicted_downsampled_x4_feats = VGG16(input=self.predicted_downsampled_x4)
 
         # FEATURE RECONSTRUCTION LOSS
-        with tf.name_scope('Multi Scale MSE'):
-            with tf.name_scope('Original Scale MSE'):
+        with tf.name_scope('Multi_Scale_MSE'):
+            with tf.name_scope('Original_Scale_MSE'):
                 conv1_1_loss = \
                     tf.losses.mean_squared_error(
                         target_feats.conv1_1,
@@ -164,7 +162,7 @@ class MosaicNet:
                                          conv3_1_loss, conv4_1_loss,
                                          conv5_1_loss]
 
-            with tf.name_scope('Downsampled x2 MSE'):
+            with tf.name_scope('Downsampled_x2_MSE'):
                 downsampled_x2_conv1_1_loss = \
                     tf.losses.mean_squared_error(
                         target_downsampled_x2_feats.conv1_1,
@@ -191,7 +189,7 @@ class MosaicNet:
                                          downsampled_x2_conv4_1_loss,
                                          downsampled_x2_conv5_1_loss]
 
-            with tf.name_scope('Downsampled x4 MSE'):
+            with tf.name_scope('Downsampled_x4_MSE'):
                 downsampled_x4_conv1_1_loss = \
                     tf.losses.mean_squared_error(
                         target_downsampled_x4_feats.conv1_1,
@@ -276,7 +274,7 @@ class MosaicNet:
                 # Saving/Logging
                 if i % self.my_config['print_freq'] == 0:
                     print('(' + self.my_config['run_id'] + ') ' +
-                          'Iteration #:' + str(i) +
+                          'Iteration ' + str(i) +
                           ', Loss: ' + str(loss))
 
                 # TODO: Implement
@@ -284,16 +282,16 @@ class MosaicNet:
                     pass
 
                 if i % self.my_config['log_freq'] == 0:
-                    print('Saving Logfile...')
+                    # print('Saving Logfile...')
                     summary = sess.run(self.summaries, feed_dict=feed_dict)
-                    writer.add_summary(summary, i+1)
+                    writer.add_summary(summary, i)
                     writer.flush()
 
                 if i % self.my_config['chkpt_freq'] == 0:
                     print('Saving Snapshot...')
                     saver.save(sess, 'snapshots/' +
-                               self.my_config['run_id'] +
-                               'checkpoint_iter', global_step=i+1)
+                               self.my_config['run_id'] + '/' +
+                               'checkpoint_iter', global_step=i)
 
     # TODO: Implement
     def predict(self):

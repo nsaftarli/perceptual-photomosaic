@@ -1,4 +1,5 @@
 import tensorflow as tf
+from src.utils import gauss2d_kernel
 
 
 def GaussianBlurLayer(input, name, k_h, k_w, stride=1):

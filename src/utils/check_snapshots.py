@@ -10,7 +10,7 @@ def check_snapshots(run_id):
     checkpoint = tf.train.latest_checkpoint(snapshots_folder)
 
     resume = False
-    start_iteration = 0
+    start_iteration = 1
 
     if checkpoint:
         choice = ''

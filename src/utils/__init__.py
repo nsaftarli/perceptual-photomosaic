@@ -1,3 +1,3 @@
-from gauss2d_kernel import *
-from slack_notify import *
-from check_snapshots import *
+from src.utils.gauss2d_kernel import *
+from src.utils.slack_notify import *
+from src.utils.check_snapshots import *
