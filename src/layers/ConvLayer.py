@@ -1,5 +1,5 @@
 import tensorflow as tf
-from Normalization import GroupNorm
+from NormalizationLayers import GroupNormLayer
 
 
 def ConvLayer(x, name, out_channels, ksize=3, stride=1, activation='leaky_relu', trainable=True):
@@ -13,9 +13,9 @@ def ConvLayer(x, name, out_channels, ksize=3, stride=1, activation='leaky_relu',
         z = tf.nn.conv2d(x, w, strides=[1, stride, stride, 1], padding='SAME') + b
 
         if activation is not None:
-            z = GroupNorm(z, G=2)
+            z = GroupNormLayer(z, G=2)
             z = tf.nn.leaky_relu(z)
         else:
-            z = GroupNorm(z, G=1)
+            z = GroupNormLayer(z, G=1)
 
         return z

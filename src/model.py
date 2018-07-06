@@ -4,9 +4,6 @@ from layers import *
 from utils import *
 from VGG16 import *
 
-w = tf.reshape(tf.constant(gauss2d_kernel(shape=(patch_size, patch_size), sigma=3), dtype=tf.float32),
-               [patch_size, patch_size, 1, 1])
-
 
 class MosaicNet:
     def __init__(self,
@@ -18,31 +15,24 @@ class MosaicNet:
         self.templates = tf.to_float(templates)
         self.tf_config = tf_config
         self.my_config = my_config
-        self.template_build_graph()
+        self.build_graph()
+        self.build_summaries()
+        print('Num Variables: ', np.sum([np.product([xi.value for xi in x.get_shape()]) for x in tf.all_variables()]))
 
     def build_graph(self):
 
-        # PLACEHOLDERS
-        self.temperature = tf.placeholder(tf.float32, shape=[])
-        self.next_batch = self.dataset.make_one_shot_iterator().get_next()
-        self.input = self.next_batch[0]
-        self.index = self.next_batch[1]
+        # GRAPH INPUTS
+        with tf.name_scope('Graph Inputs'):
+            self.temperature = tf.placeholder(tf.float32, shape=[])
+            self.learning_rate = tf.placeholder(tf.float32, shape=[])
+            self.next_batch = self.dataset.make_one_shot_iterator().get_next()
+            self.input = self.next_batch[0]
+            self.index = self.next_batch[1]
 
-        input_shape = tf.shape(self.input)
-        batch_size, input_h, input_w, input_c = [input_shape[0], input_shape[1], input_shape[2], input_shape[3]]
-        _, template_h, template_w, template_c, num_templates = tf.shape(self.templates)
-
-        # ################ Get Templates #############################################################################
-        self.template_r, self.template_g, self.template_b = tf.unstack(self.templates, axis=3)
-
-        self.template_r = tf.transpose(tf.reshape(self.template_r, [1, -1, num_templates]), perm=[0, 2, 1])
-        self.template_r = tf.tile(self.template_r, [batch_size, 1, 1])
-
-        self.template_g = tf.transpose(tf.reshape(self.template_g, [1, -1, num_templates]), perm=[0, 2, 1])
-        self.template_g = tf.tile(self.template_g, [batch_size, 1, 1])
-
-        self.template_b = tf.transpose(tf.reshape(self.template_b, [1, -1, num_templates]), perm=[0, 2, 1])
-        self.template_b = tf.tile(self.template_b, [batch_size, 1, 1])
+        self.batch_size = tf.shape(self.input)[0]
+        templates_shape = tf.shape(self.templates)
+        self.template_h, self.template_w, self.num_templates = \
+            [templates_shape[1], templates_shape[2], templates_shape[4]]
 
         # ENCODER
         with tf.name_scope('Encoder'):
@@ -50,153 +40,261 @@ class MosaicNet:
             self.decoder_in = self.encoder.pool3
 
         # DECODER
-        with tf.name_scope("Decoder"):
+        with tf.name_scope('Decoder'):
             self.conv6 = ConvLayer(self.decoder_in, 'conv6', 4096, 1, trainable)
             self.conv7 = ConvLayer(self.conv6, 'conv7', 1024, 1, trainable)
             self.conv8 = ConvLayer(self.conv7, 'conv8', 512, 1, trainable)
             self.conv9 = ConvLayer(self.conv8, 'conv9', 256, 1, trainable)
             self.conv10 = ConvLayer(self.conv9, 'conv10', 128, 1, trainable)
             self.conv11 = ConvLayer(self.conv10, 'conv11', 64, 1, trainable)
-            self.conv12 = ConvLayer(self.conv11, 'conv12', num_templates, 1, trainable, activation=None)
-        ##########################################################################################################
+            self.conv12 = ConvLayer(self.conv11, 'conv12', self.num_templates, 1, trainable, activation=None)
 
-        # ###############Softmax###################################################################################
-        self.softmax = tf.nn.softmax(self.conv12 * self.temp)
-        _, self.softmax_h, self.softmax_w, _ = self.softmax.get_shape().as_list()
-        self.template_reshaped_softmax = tf.reshape(self.softmax, [-1, self.softmax_h * self.softmax_w, num_templates])
-        ##########################################################################################################
+        # Computing template coefficients
+        with tf.name_scope('Coefficient Calculation'):
+            # (B, H/H_T, W/W_T, N_T)
+            self.softmax = tf.nn.softmax(self.conv12 * self.temperature)
+            softmax_shape = tf.shape(self.softmax)
+            self.softmax_h, self.softmax_w = (softmax_shape[1], softmax_shape[2])
+            # (B, (H/H_T) * (W/W_T), N_T)
+            self.reshaped_softmax = \
+                tf.reshape(self.softmax,
+                           [-1, self.softmax_h * self.softmax_w, self.num_templates])
 
-        ###############Output#####################################################################################
-        with tf.name_scope('output_and_tile'):
-            self.output_r = tf.matmul(self.template_reshaped_softmax, self.template_r)
+        # TEMPLATE MODIFICATIONS
+        with tf.name_scope('Template Modifications'):
+            self.template_r, self.template_g, self.template_b = tf.unstack(self.templates, axis=3)
+
+            # Unstacked templates are reshaped and tiled to (B, N_T, H_T * W_T)
+            self.template_r = tf.transpose(tf.reshape(self.template_r, [1, -1, self.num_templates]), perm=[0, 2, 1])
+            self.template_r = tf.tile(self.template_r, [self.batch_size, 1, 1])
+
+            self.template_g = tf.transpose(tf.reshape(self.template_g, [1, -1, self.num_templates]), perm=[0, 2, 1])
+            self.template_g = tf.tile(self.template_g, [self.batch_size, 1, 1])
+
+            self.template_b = tf.transpose(tf.reshape(self.template_b, [1, -1, self.num_templates]), perm=[0, 2, 1])
+            self.template_b = tf.tile(self.template_b, [self.batch_size, 1, 1])
+
+        # Constructing argmax output, channel-wise
+        with tf.name_scope('Hard Output'):
+            self.reshaped_argmax = tf.argmax(self.reshaped_softmax, axis=-1)
+            self.reshaped_argmax = tf.one_hot(self.reshaped_argmax, self.num_templates)
+            self.hard_output = self.construct_output('Channel-wise Soft Output',
+                                                     self.reshaped_argmax)
+
+        if self.my_config['train']:
+            # Constructing softmax output, channel-wise
+            with tf.name_scope('Soft Output'):
+                self.soft_output = self.construct_output('Channel-wise Soft Output',
+                                                         self.reshaped_softmax)
+            with tf.name_scope('Perceptual Loss'):
+                self.loss = self.perceptual_loss(self.input, self.soft_output)
+
+    def construct_output(self, name, coefficients):
+        with tf.name_scope(name):
+            # (B, (H/H_T) * (W/W_T), H_T * W_T)
+            self.output_r = tf.matmul(coefficients, self.template_r)
+            # (B, H, W, 1)
             self.output_r = tf.reshape(tf.transpose(tf.reshape(
-                self.output_r, [batch_size, self.softmax_h, self.softmax_w, patch_size, patch_size]),
-                perm=[0, 1, 3, 2, 4]), [batch_size, 376, img_new_size, 1])
+                self.output_r, [self.batch_size, self.softmax_h, self.softmax_w, self.template_h, self.template_w]),
+                perm=[0, 1, 3, 2, 4]), [self.batch_size, self.softmax_h * self.template_h, self.softmax_w * self.template_w, 1])
 
-            self.output_g = tf.matmul(self.template_reshaped_softmax, self.template_g)
+            self.output_g = tf.matmul(coefficients, self.template_g)
             self.output_g = tf.reshape(tf.transpose(tf.reshape(
-                self.output_g, [batch_size, self.softmax_h, self.softmax_w, patch_size, patch_size]),
-                perm=[0, 1, 3, 2, 4]), [batch_size, 376, img_new_size, 1])
+                self.output_g, [self.batch_size, self.softmax_h, self.softmax_w, self.template_h, self.template_w]),
+                perm=[0, 1, 3, 2, 4]), [self.batch_size, self.softmax_h * self.template_h, self.softmax_w * self.template_w, 1])
 
-            self.output_b = tf.matmul(self.template_reshaped_softmax, self.template_b)
+            self.output_b = tf.matmul(coefficients, self.template_b)
             self.output_b = tf.reshape(tf.transpose(tf.reshape(
-                self.output_b, [batch_size, self.softmax_h, self.softmax_w, patch_size, patch_size]),
-                perm=[0, 1, 3, 2, 4]), [batch_size, 376, img_new_size, 1])
+                self.output_b, [self.batch_size, self.softmax_h, self.softmax_w, self.template_h, self.template_w]),
+                perm=[0, 1, 3, 2, 4]), [self.batch_size, self.softmax_h * self.template_h, self.softmax_w * self.template_w, 1])
 
-        with tf.name_scope('soft_output'):
-            self.view_output = tf.concat([self.output_r, self.output_g, self.output_b], axis=3)
+            return tf.concat([self.output_r, self.output_g, self.output_b], axis=3)
 
-        with tf.name_scope('blurred_out'):
-            self.template_blurred_out = self.template_blur_recombine(self.view_output, w, stride=1)
+    def perceptual_loss(self, target, predicted):
+        with tf.name_scope('Blurred Predicted'):
+            blurred_predicted = GaussianBlurLayer(predicted)
+            self.blurred_predicted = blurred_predicted
 
-        ##########################################################################################################
-        if trainable:
-            ################Gaussian Pyramid###########################################################################
-            self.in_d1 = self.template_blur_recombine(self.input, w, stride=2)
-            self.in_d2 = self.template_blur_recombine(self.in_d1, w, stride=2)
-            self.out_d1 = self.template_blur_recombine(self.template_blurred_out, w, stride=2)
-            self.out_d2 = self.template_blur_recombine(self.out_d1, w, stride=2)
+        # Gaussian Pyramid
+        with tf.name_scope('Gaussian Pyramid'):
+            target_downsampled_x2 = GaussianBlurLayer(target, 2)
+            self.target_downsampled_x2 = target_downsampled_x2
 
-            # ##############Loss and Regularizers######################################################################
-            with tf.name_scope('multiscale_structure_features'):
-                self.vgg2 = VGG16(input=self.template_blurred_out, trainable=False)
+            target_downsampled_x4 = GaussianBlurLayer(target_downsampled_x2, 2)
+            self.target_downsampled_x4 = target_downsampled_x4
 
-                self.vgg_in_d1 = VGG16(input=self.in_d1, trainable=False)
-                self.vgg_in_d2 = VGG16(input=self.in_d2, trainable=False)
-                self.vgg_out_d1 = VGG16(input=self.out_d1, trainable=False)
-                self.vgg_out_d2 = VGG16(input=self.out_d2, trainable=False)
+            predicted_downsampled_x2 = GaussianBlurLayer(predicted, 2)
+            self.predicted_downsampled_x2 = predicted_downsampled_x2
 
+            predicted_downsampled_x4 = GaussianBlurLayer(predicted_downsampled_x2, 2)
+            self.predicted_downsampled_x4 = predicted_downsampled_x4
 
-            ################Structure Loss############################################################################
-            self.f_loss1 = tf.losses.mean_squared_error(self.encoder.conv1_1, self.vgg2.conv1_1)
-            self.f_loss2 = tf.losses.mean_squared_error(self.encoder.conv2_1, self.vgg2.conv2_1)
-            self.f_loss3 = tf.losses.mean_squared_error(self.encoder.conv3_1, self.vgg2.conv3_1)
-            self.f_loss4 = tf.losses.mean_squared_error(self.encoder.conv4_1, self.vgg2.conv4_1)
-            self.f_loss5 = tf.losses.mean_squared_error(self.encoder.conv5_1, self.vgg2.conv5_1)
+        # Get image features
+        target_feats = self.encoder
+        target_downsampled_x2_feats = VGG16(input=target_downsampled_x2)
+        target_downsampled_x4_feats = VGG16(input=target_downsampled_x4)
+        blurred_predicted_feats = VGG16(input=blurred_predicted)
+        predicted_downsampled_x2_feats = VGG16(input=predicted_downsampled_x2)
+        predicted_downsampled_x4_feats = VGG16(input=predicted_downsampled_x4)
 
-            self.template_blur_loss = (tf.losses.mean_squared_error(self.vgg_in_d1.conv1_1, self.vgg_out_d1.conv1_1)) + \
-                             (tf.losses.mean_squared_error(self.vgg_in_d2.conv1_1, self.vgg_out_d2.conv1_1)) + \
-                             (tf.losses.mean_squared_error(self.vgg_in_d1.conv2_1, self.vgg_out_d1.conv2_1)) + \
-                             (tf.losses.mean_squared_error(self.vgg_in_d2.conv2_1, self.vgg_out_d2.conv2_1))
+        # FEATURE RECONSTRUCTION LOSS
+        with tf.name_scope('Multi Scale MSE'):
+            with tf.name_scope('Original Scale MSE'):
+                conv1_1_loss = \
+                    tf.losses.mean_squared_error(
+                        target_feats.conv1_1,
+                        blurred_predicted_feats.conv1_1)
+                conv2_1_loss = \
+                    tf.losses.mean_squared_error(
+                        target_feats.conv2_1,
+                        blurred_predicted_feats.conv2_1)
+                conv3_1_loss = \
+                    tf.losses.mean_squared_error(
+                        target_feats.conv3_1,
+                        blurred_predicted_feats.conv3_1)
+                conv4_1_loss = \
+                    tf.losses.mean_squared_error(
+                        target_feats.conv4_1,
+                        blurred_predicted_feats.conv4_1)
+                conv5_1_loss = \
+                    tf.losses.mean_squared_error(
+                        target_feats.conv5_1,
+                        blurred_predicted_feats.conv5_1)
+                original_scale_losses = [conv1_1_loss, conv2_1_loss,
+                                         conv3_1_loss, conv4_1_loss,
+                                         conv5_1_loss]
 
-            self.structure_loss = self.f_loss1 + self.f_loss2 + self.f_loss3 #+ self.f_loss4 + self.f_loss5 #+ self.template_blur_loss
-            ###########################################################################################################
-            self.tLoss = self.structure_loss + self.template_blur_loss
-            ##########################################################################################################
+            with tf.name_scope('Downsampled x2 MSE'):
+                downsampled_x2_conv1_1_loss = \
+                    tf.losses.mean_squared_error(
+                        target_downsampled_x2_feats.conv1_1,
+                        predicted_downsampled_x2_feats.conv1_1)
+                downsampled_x2_conv2_1_loss = \
+                    tf.losses.mean_squared_error(
+                        target_downsampled_x2_feats.conv2_1,
+                        predicted_downsampled_x2_feats.conv2_1)
+                downsampled_x2_conv3_1_loss = \
+                    tf.losses.mean_squared_error(
+                        target_downsampled_x2_feats.conv3_1,
+                        predicted_downsampled_x2_feats.conv3_1)
+                downsampled_x2_conv4_1_loss = \
+                    tf.losses.mean_squared_error(
+                        target_downsampled_x2_feats.conv4_1,
+                        predicted_downsampled_x2_feats.conv4_1)
+                downsampled_x2_conv5_1_loss = \
+                    tf.losses.mean_squared_error(
+                        target_downsampled_x2_feats.conv5_1,
+                        predicted_downsampled_x2_feats.conv5_1)
+                downsampled_x2_losses = [downsampled_x2_conv1_1_loss,
+                                         downsampled_x2_conv2_1_loss,
+                                         downsampled_x2_conv3_1_loss,
+                                         downsampled_x2_conv4_1_loss,
+                                         downsampled_x2_conv5_1_loss]
 
-            self.entropy = EntropyRegularizer(self.softmax) * 1e3
-            self.variance = VarianceRegularizer(self.softmax, num_temps=NUM_TEMPLATES) * 1e2
-            self.template_build_summaries()
+            with tf.name_scope('Downsampled x4 MSE'):
+                downsampled_x4_conv1_1_loss = \
+                    tf.losses.mean_squared_error(
+                        target_downsampled_x4_feats.conv1_1,
+                        predicted_downsampled_x4_feats.conv1_1)
+                downsampled_x4_conv2_1_loss = \
+                    tf.losses.mean_squared_error(
+                        target_downsampled_x4_feats.conv2_1,
+                        predicted_downsampled_x4_feats.conv2_1)
+                downsampled_x4_conv3_1_loss = \
+                    tf.losses.mean_squared_error(
+                        target_downsampled_x4_feats.conv3_1,
+                        predicted_downsampled_x4_feats.conv3_1)
+                downsampled_x4_conv4_1_loss = \
+                    tf.losses.mean_squared_error(
+                        target_downsampled_x4_feats.conv4_1,
+                        predicted_downsampled_x4_feats.conv4_1)
+                downsampled_x4_conv5_1_loss = \
+                    tf.losses.mean_squared_error(
+                        target_downsampled_x4_feats.conv5_1,
+                        predicted_downsampled_x4_feats.conv5_1)
+                downsampled_x4_losses = [downsampled_x4_conv1_1_loss,
+                                         downsampled_x4_conv2_1_loss,
+                                         downsampled_x4_conv3_1_loss,
+                                         downsampled_x4_conv4_1_loss,
+                                         downsampled_x4_conv5_1_loss]
 
-
-
-
-    def get_avg_colour(self, input):
-        return tf.nn.avg_pool(input, ksize=[1, patch_size, patch_size, 1], strides=[1, patch_size, patch_size, 1], padding='VALID')
-
+        return \
+            tf.add_n(original_scale_losses) + \
+            tf.add_n(downsampled_x2_losses) + \
+            tf.add_n(downsampled_x4_losses)
 
     def build_summaries(self):
         tf.summary.image('target', tf.cast(self.input, tf.uint8), max_outputs=6)
-        tf.summary.image('output', tf.cast(self.view_output, tf.uint8), max_outputs=6)
+        tf.summary.image('target_downsampled_x2', tf.cast(self.target_downsampled_x2, tf.uint8), max_outputs=6)
+        tf.summary.image('target_downsampled_x4', tf.cast(self.target_downsampled_x4, tf.uint8), max_outputs=6)
 
+        tf.summary.image('soft_output', tf.cast(self.soft_output, tf.uint8), max_outputs=6)
+        tf.summary.image('blurred_predicted', tf.cast(self.blurred_predicted, tf.uint8), max_outputs=6)
+        tf.summary.image('predicted_downsampled_x2', tf.cast(self.predicted_downsampled_x2, tf.uint8), max_outputs=6)
+        tf.summary.image('predicted_downsampled_x4', tf.cast(self.predicted_downsampled_x4, tf.uint8), max_outputs=6)
+
+        tf.summary.image('hard_output', tf.cast(self.hard_output, tf.uint8), max_outputs=6)
+
+        self.entropy = EntropyLayer(self.softmax)
+        self.variance = VarianceLayer(self.softmax,
+                                      num_bins=self.num_templates)
         tf.summary.scalar('entropy', self.entropy)
         tf.summary.scalar('variance', self.variance)
-        tf.summary.scalar('temperature', self.temp)
-        tf.summary.scalar('total_loss', self.tLoss)
-        tf.summary.scalar('Struct_loss', self.structure_loss)
+        tf.summary.scalar('temperature', self.temperature)
+        tf.summary.scalar('total_loss', self.loss)
 
         self.summaries = tf.summary.merge_all()
 
-    def blur_recombine(self, input, w, stride=1):
-        with tf.name_scope('input'):
-            r, g, b = tf.split(input, 3, axis=3)
-            r = tf.nn.conv2d(r, w, strides=[1, stride, stride, 1], padding='SAME')
-            g = tf.nn.conv2d(g, w, strides=[1, stride, stride, 1], padding='SAME')
-            b = tf.nn.conv2d(b, w, strides=[1, stride, stride, 1], padding='SAME')
-            return tf.concat([r, g, b], axis=3)
-
-
-    # TODO: Implement
     def train(self):
-        pass
+        opt = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate)
+        train_step = opt.minimize(self.loss)
+
+        saver = tf.train.Saver()
+
+        with tf.Session(config=self.tf_config) as sess:
+            resume, iterations_so_far = check_snapshots(self.my_config['run_id'])
+            writer = tf.summary.FileWriter('logs/' + self.my_config['run_id'],
+                                           sess.graph)
+
+            if resume:
+                saver.restore(sess, resume)
+            else:
+                sess.run(tf.global_variables_initializer())
+
+            temperature = self.my_config['init_temperature']
+            learning_rate = self.my_config['learning_rate']
+            for i in range(iterations_so_far, self.my_config['iterations']):
+                # Temperature Schedule
+                if i > 1 and i % 1000 == 0:
+                    if i < 8000:
+                        temperature *= 2
+
+                feed_dict = {self.learning_rate: learning_rate,
+                             self.temperature: temperature}
+                loss = sess.run([train_step, self.loss], feed_dict=feed_dict)[1]
+
+                # Saving/Logging
+                if i % self.my_config['print_freq'] == 0:
+                    print('(' + self.my_config['run_id'] + ') ' +
+                          'Iteration #:' + str(i) +
+                          ', Loss: ' + str(loss))
+
+                # TODO: Implement
+                if i % self.my_config['val_freq'] == 0:
+                    pass
+
+                if i % self.my_config['log_freq'] == 0:
+                    print('Saving Logfile...')
+                    summary = sess.run(self.summaries, feed_dict=feed_dict)
+                    writer.add_summary(summary, i+1)
+                    writer.flush()
+
+                if i % self.my_config['chkpt_freq'] == 0:
+                    print('Saving Snapshot...')
+                    saver.save(sess, 'snapshots/' +
+                               self.my_config['run_id'] +
+                               'checkpoint_iter', global_step=i+1)
 
     # TODO: Implement
     def predict(self):
         pass
-
-    def optimize(self, loss):
-        lr = tf.placeholder(tf.float32,shape=[])
-        opt = tf.train.GradientDescentOptimizer(learning_rate=lr).minimize(loss)
-        return opt, lr
-
-
-    def print_architecture(self):
-        print(self.conv1_1.get_shape())
-        print(self.conv1_2.get_shape())
-        print(self.conv2_1.get_shape())
-        print(self.conv2_2.get_shape())
-        print(self.conv3_1.get_shape())
-        print(self.conv3_2.get_shape())
-        print(self.conv3_3.get_shape())
-        print(self.conv4_1.get_shape())
-        print(self.conv4_2.get_shape())
-        print(self.conv4_3.get_shape())
-        print(self.conv5_1.get_shape())
-        print(self.conv5_2.get_shape())
-        print(self.conv5_3.get_shape())
-        print(self.conv6_1.get_shape())
-        print(self.conv6_2.get_shape())
-        print(self.conv6_3.get_shape())
-        print(self.conv7_3.get_shape())
-        print(self.conv7_2.get_shape())
-        print(self.conv7_3.get_shape())
-        print(self.conv8_1.get_shape())
-        print(self.conv8_2.get_shape())
-        print(self.conv8_3.get_shape())
-        print(self.conv9_1.get_shape())
-        print(self.conv9_2.get_shape())
-        print(self.conv10_1.get_shape())
-        print(self.conv10_2.get_shape())
-        print(self.softmax.get_shape())
-        print(self.flat_softmax.get_shape())
-        print('Num Variables: ', np.sum([np.product([xi.value for xi in x.get_shape()]) for x in tf.all_variables()]))

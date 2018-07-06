@@ -11,10 +11,10 @@ class Dataset:
         self.path = path
 
     def data_generator(self):
-        files = os.listdir(self.path)
+        files = sorted(os.listdir(self.path))
         num_files = len(files)
         for i in itertools.count(1):
-            img = imread(files[i % num_files]).astype('float32')
+            img = imread(files[i % num_files], mode='RGB').astype('float32')
             yield img, i
 
 
@@ -29,7 +29,7 @@ def get_templates(path):
     return images
 
 
-################## Stopped Here ######################################
+# Move to utils
 def turn_im_into_templates(path, patch_size=8):
     im = imread(path)
     x = 0
@@ -39,19 +39,3 @@ def turn_im_into_templates(path, patch_size=8):
             out = Image.fromarray(patch.astype('uint8'))
             out.save('./assets/cam_templates_2/' + str(x) + '.png', 'PNG')
             x += 1
-
-
-def clean_dataset(path='../data/coco-resized-512/'):
-    path = '/home/nsaftarl/ASCIIArtNN/assets/coco-set/train2014/'
-    for im in os.listdir(path):
-        if len(imread(path + im)).shape) < 3:
-            os.remove(path + im)
-
-def resize_dataset(in_path = '/home/nsaftarl/ASCIIArtNN/assets/coco-set/train2014/',
-                   out_path = '/home/nsaftarl/ASCIIArtNN/assets/coco-resized-512/'):
-    if not os.path.exists(out_path):
-        os.makedirs(out_path)
-    for im in os.listdir('/home/nsaftarl/ASCIIArtNN/assets/coco-set/train2014/'):
-        img = imread(in_path + im).resize((512, 512), resample=Image.BILINEAR), dtype='uint8')
-        img = Image.fromarray(img)
-        img.save(out_path + im)

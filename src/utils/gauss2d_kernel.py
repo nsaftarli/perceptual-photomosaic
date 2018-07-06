@@ -1,4 +1,5 @@
-import numpy as np 
+import numpy as np
+
 
 def gauss2d_kernel(shape=(3, 3), sigma=0.5):
     """
