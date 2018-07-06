@@ -20,7 +20,8 @@ parser.add_argument('-logf', '--log_freq', default=10, type=int)
 parser.add_argument('-printf', '--print_freq', default=10, type=int)
 parser.add_argument('-chkpt', '--chkpt_freq', default=500, type=int)
 parser.add_argument('-valf', '--val_freq', default=500, type=int)
-parser.add_argument('-dpath', '--data_folder', default='data/coco_resized_512/', type=str)
+parser.add_argument('-tpath', '--train_path', default='data/coco_resized_512_train/', type=str)
+parser.add_argument('-vpath', '--val_path', default='data/coco_resized_512_val/', type=str)
 parser.add_argument('-folder', '--template_folder', default='black_ascii_8', type=str)
 parser.add_argument('-id', '--run_id', default=time.strftime('%d%b-%X'), type=str)
 args = parser.parse_args()
@@ -49,7 +50,8 @@ base_lr = args.learning_rate
 t = args.init_temperature
 notes = args.notes
 template_folder = args.template_folder
-data_folder = args.data_folder
+train_path = args.train_path
+val_path = args.val_path
 run_id = args.run_id
 
 
@@ -62,16 +64,13 @@ config.allow_soft_placement = True
 
 
 # DATA INPUT
-d = Dataset(path=data_folder)
-dataset = tf.data.Dataset.from_generator(
-    d.data_generator,
-    (tf.float32, tf.int32)).prefetch(batch_size * 3).batch(batch_size)
+d = Dataset(training_path=train_path, validation_path=val_path, config=my_config)
 templates = get_templates(path='data/' + template_folder + '/')
 
 
 # BUILD GRAPH
 with tf.device('/gpu:' + str(gpu)):
-    m = MosaicNet(dataset, templates, tf_config=config, my_config=my_config)
+    m = MosaicNet(d, templates, tf_config=config, my_config=my_config)
 
 
 if train:
@@ -80,10 +79,13 @@ if train:
     snapshot_dir = 'snapshots/' + run_id + '/'
     im_dir = 'data/out/' + run_id + '/'
     notes_dir = 'notes/' + run_id + '/'
-    os.makedirs(log_dir)
-    os.makedirs(snapshot_dir)
-    os.makedirs(im_dir)
-    os.makedirs(notes_dir)
+    try:
+        os.makedirs(log_dir)
+        os.makedirs(snapshot_dir)
+        os.makedirs(im_dir)
+        os.makedirs(notes_dir)
+    except OSError:
+        pass
 
     # Write to notes file
     with open(notes_dir + 'info.txt', 'w') as fp:
@@ -99,6 +101,8 @@ if train:
 
     # Start Training
     m.train()
+else:
+    m.predict()
 
 slack_msg = 'Experiment done on gpu #' + str(gpu) + ' on Delta'
 slack_notify('nariman_saftarli', slack_msg)

@@ -22,7 +22,7 @@ def check_snapshots(run_id):
             if choice == 'y':
                 resume = checkpoint
                 start_iteration = int(checkpoint.split(snapshots_folder)
-                                      [1][5:-5])
+                                      [1][16:])
                 print('resuming from iteration ' + str(start_iteration))
             else:
                 print('removing old snapshots and logs, training from scratch')

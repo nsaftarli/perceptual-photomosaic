@@ -1,5 +1,7 @@
 import os
+from functools import partial
 import numpy as np
+import tensorflow as tf
 from PIL import Image
 import itertools
 from scipy.misc import imread
@@ -7,15 +9,39 @@ from scipy.misc import imread
 
 class Dataset:
 
-    def __init__(self, path):
-        self.path = path
+    def __init__(self, training_path, validation_path, config):
+        self.train_path = training_path
+        self.val_path = validation_path
+        self.handle = tf.placeholder(tf.string, shape=[])
+        self.iterator = tf.data.Iterator.from_string_handle(self.handle, (tf.float32, tf.int32, tf.int32))
+        train_generator = partial(self.data_generator, path=self.train_path)
+        val_generator = partial(self.data_generator, path=self.val_path, train=False)
+        self.train_dataset = \
+            tf.data.Dataset.from_generator(train_generator, (tf.float32, tf.int32, tf.int32))
+        self.val_dataset = \
+            tf.data.Dataset.from_generator(val_generator, (tf.float32, tf.int32, tf.int32))
+        self.config = config
 
-    def data_generator(self):
-        files = sorted(os.listdir(self.path))
+    def get_training_handle(self):
+        self.train_dataset = \
+            self.train_dataset.prefetch(self.config['batch_size'] * 3) \
+                              .batch(self.config['batch_size'])
+        self.train_iterator = self.train_dataset.make_one_shot_iterator()
+        return self.train_iterator.string_handle()
+
+    def get_validation_handle(self):
+        self.val_dataset = \
+            self.val_dataset.prefetch(self.config['batch_size'] * 3) \
+                            .batch(self.config['batch_size'])
+        self.val_iterator = self.val_dataset.make_initializable_iterator()
+        return self.val_iterator.string_handle()
+
+    def data_generator(self, path, train=True):
+        files = sorted(os.listdir(path))
         num_files = len(files)
-        for i in itertools.count(1):
-            img = imread(self.path + files[i % num_files], mode='RGB').astype('float32')
-            yield img, i
+        for i in (itertools.count(1) if train else range(num_files)):
+            img = imread(path + files[i % num_files], mode='RGB').astype('float32')
+            yield img, i, num_files
 
 
 def get_templates(path):

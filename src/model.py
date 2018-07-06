@@ -1,5 +1,6 @@
 import tensorflow as tf
 import numpy as np
+import scipy.misc as misc
 from src.layers import *
 from src.utils import *
 from src.VGG16 import *
@@ -26,9 +27,11 @@ class MosaicNet:
         with tf.name_scope('Graph_Inputs'):
             self.temperature = tf.placeholder(tf.float32, shape=[])
             self.learning_rate = tf.placeholder(tf.float32, shape=[])
-            self.next_batch = self.dataset.make_one_shot_iterator().get_next()
+            self.val_loss = tf.placeholder(tf.float32, shape=[])
+            self.next_batch = self.dataset.iterator.get_next()
             self.input = self.next_batch[0]
             self.index = self.next_batch[1]
+            self.dataset_size = self.next_batch[2]
 
         self.batch_size = tf.shape(self.input)[0]
         templates_shape = self.templates.get_shape().as_list()
@@ -225,29 +228,23 @@ class MosaicNet:
         tf.summary.image('target', tf.cast(self.input, tf.uint8), max_outputs=6)
         tf.summary.image('target_downsampled_x2', tf.cast(self.target_downsampled_x2, tf.uint8), max_outputs=6)
         tf.summary.image('target_downsampled_x4', tf.cast(self.target_downsampled_x4, tf.uint8), max_outputs=6)
-
         tf.summary.image('soft_output', tf.cast(self.soft_output, tf.uint8), max_outputs=6)
         tf.summary.image('blurred_predicted', tf.cast(self.blurred_predicted, tf.uint8), max_outputs=6)
         tf.summary.image('predicted_downsampled_x2', tf.cast(self.predicted_downsampled_x2, tf.uint8), max_outputs=6)
         tf.summary.image('predicted_downsampled_x4', tf.cast(self.predicted_downsampled_x4, tf.uint8), max_outputs=6)
-
         tf.summary.image('hard_output', tf.cast(self.hard_output, tf.uint8), max_outputs=6)
-
-        self.entropy = EntropyLayer(self.softmax)
-        self.variance = VarianceLayer(self.softmax,
-                                      num_bins=self.num_templates)
-        tf.summary.scalar('entropy', self.entropy)
-        tf.summary.scalar('variance', self.variance)
+        tf.summary.scalar('entropy', EntropyLayer(self.softmax))
+        tf.summary.scalar('variance', VarianceLayer(self.softmax, num_bins=self.num_templates))
         tf.summary.scalar('temperature', self.temperature)
-        tf.summary.scalar('total_loss', self.loss)
-
+        tf.summary.scalar('train_loss', self.loss)
+        self.val_loss_summary = tf.summary.scalar('validation_loss', self.val_loss, collections=['val'])
         self.summaries = tf.summary.merge_all()
 
     def train(self):
         opt = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate)
         train_step = opt.minimize(self.loss)
 
-        saver = tf.train.Saver()
+        saver = tf.train.Saver(max_to_keep=0, pad_step_number=16)
 
         with tf.Session(config=self.tf_config) as sess:
             resume, iterations_so_far = check_snapshots(self.my_config['run_id'])
@@ -259,6 +256,8 @@ class MosaicNet:
             else:
                 sess.run(tf.global_variables_initializer())
 
+            train_handle = sess.run(self.dataset.get_training_handle())
+            val_handle = sess.run(self.dataset.get_validation_handle())
             temperature = self.my_config['init_temperature']
             learning_rate = self.my_config['learning_rate']
             for i in range(iterations_so_far, self.my_config['iterations']):
@@ -267,9 +266,13 @@ class MosaicNet:
                     if i < 8000:
                         temperature *= 2
 
-                feed_dict = {self.learning_rate: learning_rate,
-                             self.temperature: temperature}
-                loss = sess.run([train_step, self.loss], feed_dict=feed_dict)[1]
+                train_feed_dict = {self.learning_rate: learning_rate,
+                                   self.temperature: temperature,
+                                   self.dataset.handle: train_handle}
+                results = sess.run([train_step, self.loss, self.summaries],
+                                   feed_dict=train_feed_dict)
+                loss = results[1]
+                train_summary = results[2]
 
                 # Saving/Logging
                 if i % self.my_config['print_freq'] == 0:
@@ -277,21 +280,53 @@ class MosaicNet:
                           'Iteration ' + str(i) +
                           ', Loss: ' + str(loss))
 
-                # TODO: Implement
                 if i % self.my_config['val_freq'] == 0:
-                    pass
+                    # Reset validation iterator to beginning
+                    sess.run(self.dataset.val_iterator.initializer)
+
+                    val_feed_dict = {self.temperature: temperature,
+                                     self.dataset.handle: val_handle}
+                    val_loss = self.validate(sess, val_feed_dict, i)
+                    val_summary = sess.run(self.val_loss_summary,
+                                           feed_dict={self.val_loss: val_loss})
+                    writer.add_summary(val_summary, i)
+                    writer.flush()
 
                 if i % self.my_config['log_freq'] == 0:
                     # print('Saving Logfile...')
-                    summary = sess.run(self.summaries, feed_dict=feed_dict)
-                    writer.add_summary(summary, i)
+                    writer.add_summary(train_summary, i)
                     writer.flush()
 
-                if i % self.my_config['chkpt_freq'] == 0:
+                if i % self.my_config['chkpt_freq'] == 0 and i != iterations_so_far:
                     print('Saving Snapshot...')
                     saver.save(sess, 'snapshots/' +
                                self.my_config['run_id'] + '/' +
                                'checkpoint_iter', global_step=i)
+
+    def validate(self, sess, feed_dict, train_iter):
+        loss_sum = 0.0
+        avg_loss = 0
+        while True:
+            try:
+                res = sess.run([self.loss, self.dataset_size, self.index, self.input, self.hard_output],
+                               feed_dict=feed_dict)
+                loss_sum += res[0]
+                output = np.concatenate([res[3], res[4]], axis=2)
+                write_directory = 'data/out/' + self.my_config['run_id'] + \
+                                  '/' + str(train_iter)
+                self.write_images(output, write_directory, res[2])
+            except tf.errors.OutOfRangeError:
+                dataset_size = res[1][-1]
+                avg_loss = loss_sum / dataset_size
+                break
+        return avg_loss
+
+    def write_images(self, images, path, inds):
+        if not os.path.exists(path):
+            os.makedirs(path)
+        for i in range(images.shape[0]):
+            misc.imsave(path + '/' + str(inds[i]).zfill(8) + '.png', images[i])
+
 
     # TODO: Implement
     def predict(self):
