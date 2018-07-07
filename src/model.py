@@ -1,6 +1,5 @@
 import tensorflow as tf
 import numpy as np
-import scipy.misc as misc
 from src.layers import *
 from src.utils import *
 from src.VGG16 import *
@@ -17,7 +16,6 @@ class MosaicNet:
         self.tf_config = tf_config
         self.my_config = my_config
         self.build_graph()
-        self.build_summaries()
         print('Num Variables: ', np.sum([np.product([xi.value for xi in x.get_shape()]) for x in tf.all_variables()]))
 
     def build_graph(self):
@@ -92,6 +90,8 @@ class MosaicNet:
                                                          self.reshaped_softmax)
             with tf.name_scope('Perceptual_Loss'):
                 self.loss = self.perceptual_loss(self.input, self.soft_output)
+
+            self.build_summaries()
 
     def construct_output(self, name, coefficients):
         with tf.name_scope(name):
@@ -225,31 +225,37 @@ class MosaicNet:
             tf.add_n(downsampled_x4_losses)
 
     def build_summaries(self):
-        tf.summary.image('target', tf.cast(self.input, tf.uint8), max_outputs=6)
-        tf.summary.image('target_downsampled_x2', tf.cast(self.target_downsampled_x2, tf.uint8), max_outputs=6)
-        tf.summary.image('target_downsampled_x4', tf.cast(self.target_downsampled_x4, tf.uint8), max_outputs=6)
-        tf.summary.image('soft_output', tf.cast(self.soft_output, tf.uint8), max_outputs=6)
-        tf.summary.image('blurred_predicted', tf.cast(self.blurred_predicted, tf.uint8), max_outputs=6)
-        tf.summary.image('predicted_downsampled_x2', tf.cast(self.predicted_downsampled_x2, tf.uint8), max_outputs=6)
-        tf.summary.image('predicted_downsampled_x4', tf.cast(self.predicted_downsampled_x4, tf.uint8), max_outputs=6)
-        tf.summary.image('hard_output', tf.cast(self.hard_output, tf.uint8), max_outputs=6)
-        tf.summary.scalar('entropy', EntropyLayer(self.softmax))
-        tf.summary.scalar('variance', VarianceLayer(self.softmax, num_bins=self.num_templates))
-        tf.summary.scalar('temperature', self.temperature)
-        tf.summary.scalar('train_loss', self.loss)
-        self.val_loss_summary = tf.summary.scalar('validation_loss', self.val_loss, collections=['val'])
-        self.summaries = tf.summary.merge_all()
+        with tf.name_scope('Summaries'):
+            tf.summary.image('target', tf.cast(self.input, tf.uint8), max_outputs=6)
+            tf.summary.image('target_downsampled_x2', tf.cast(self.target_downsampled_x2, tf.uint8), max_outputs=6)
+            tf.summary.image('target_downsampled_x4', tf.cast(self.target_downsampled_x4, tf.uint8), max_outputs=6)
+            tf.summary.image('soft_output', tf.cast(self.soft_output, tf.uint8), max_outputs=6)
+            tf.summary.image('blurred_predicted', tf.cast(self.blurred_predicted, tf.uint8), max_outputs=6)
+            tf.summary.image('predicted_downsampled_x2', tf.cast(self.predicted_downsampled_x2, tf.uint8), max_outputs=6)
+            tf.summary.image('predicted_downsampled_x4', tf.cast(self.predicted_downsampled_x4, tf.uint8), max_outputs=6)
+            tf.summary.image('hard_output', tf.cast(self.hard_output, tf.uint8), max_outputs=6)
+            tf.summary.scalar('entropy', EntropyLayer(self.softmax))
+            tf.summary.scalar('variance', VarianceLayer(self.softmax, num_bins=self.num_templates))
+            tf.summary.scalar('temperature', self.temperature)
+            tf.summary.scalar('train_loss', self.loss)
+            self.val_loss_summary = tf.summary.scalar('validation_loss', self.val_loss, collections=['val'])
+            self.summaries = tf.summary.merge_all()
 
     def train(self):
         opt = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate)
         train_step = opt.minimize(self.loss)
 
         saver = tf.train.Saver(max_to_keep=0, pad_step_number=16)
+        saved_iterator = \
+            tf.contrib.data.make_saveable_from_iterator(self.dataset.iterator)
+
+        tf.add_to_collection(tf.GraphKeys.SAVEABLE_OBJECTS, saved_iterator)
 
         with tf.Session(config=self.tf_config) as sess:
             resume, iterations_so_far = check_snapshots(self.my_config['run_id'])
             writer = tf.summary.FileWriter('logs/' + self.my_config['run_id'],
                                            sess.graph)
+
 
             if resume:
                 saver.restore(sess, resume)
@@ -293,7 +299,6 @@ class MosaicNet:
                     writer.flush()
 
                 if i % self.my_config['log_freq'] == 0:
-                    # print('Saving Logfile...')
                     writer.add_summary(train_summary, i)
                     writer.flush()
 
@@ -314,20 +319,31 @@ class MosaicNet:
                 output = np.concatenate([res[3], res[4]], axis=2)
                 write_directory = 'data/out/' + self.my_config['run_id'] + \
                                   '/' + str(train_iter)
-                self.write_images(output, write_directory, res[2])
+                write_images(output, write_directory, res[2])
             except tf.errors.OutOfRangeError:
                 dataset_size = res[1][-1]
                 avg_loss = loss_sum / dataset_size
                 break
         return avg_loss
 
-    def write_images(self, images, path, inds):
-        if not os.path.exists(path):
-            os.makedirs(path)
-        for i in range(images.shape[0]):
-            misc.imsave(path + '/' + str(inds[i]).zfill(8) + '.png', images[i])
+    def predict(self, model_path):
+        saver = tf.train.Saver()
+        checkpoint_path = tf.train.latest_checkpoint(model_path)
 
+        with tf.Session(config=self.tf_config) as sess:
+            saver.restore(sess, checkpoint_path)
 
-    # TODO: Implement
-    def predict(self):
-        pass
+            pred_handle = sess.run(self.dataset.get_prediction_handle())
+            sess.run(self.dataset.pred_iterator.initializer)
+            feed_dict = {self.temperature: 1.0,
+                         self.dataset.handle: pred_handle}
+
+            while True:
+                try:
+                    res = sess.run([self.index, self.hard_output],
+                                   feed_dict=feed_dict)
+                    output = res[1]
+                    write_directory = self.dataset.pred_path + '/out/'
+                    write_images(output, write_directory, res[0])
+                except tf.errors.OutOfRangeError:
+                    break

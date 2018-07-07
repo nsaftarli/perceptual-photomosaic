@@ -9,17 +9,21 @@ from scipy.misc import imread
 
 class Dataset:
 
-    def __init__(self, training_path, validation_path, config):
+    def __init__(self, training_path, validation_path, prediction_path, config):
         self.train_path = training_path
         self.val_path = validation_path
+        self.pred_path = prediction_path
         self.handle = tf.placeholder(tf.string, shape=[])
         self.iterator = tf.data.Iterator.from_string_handle(self.handle, (tf.float32, tf.int32, tf.int32))
         train_generator = partial(self.data_generator, path=self.train_path)
         val_generator = partial(self.data_generator, path=self.val_path, train=False)
+        pred_generator = partial(self.data_generator, path=self.pred_path, train=False)
         self.train_dataset = \
             tf.data.Dataset.from_generator(train_generator, (tf.float32, tf.int32, tf.int32))
         self.val_dataset = \
             tf.data.Dataset.from_generator(val_generator, (tf.float32, tf.int32, tf.int32))
+        self.pred_dataset = \
+            tf.data.Dataset.from_generator(pred_generator, (tf.float32, tf.int32, tf.int32))
         self.config = config
 
     def get_training_handle(self):
@@ -35,6 +39,13 @@ class Dataset:
                             .batch(self.config['batch_size'])
         self.val_iterator = self.val_dataset.make_initializable_iterator()
         return self.val_iterator.string_handle()
+
+    def get_prediction_handle(self):
+        self.pred_dataset = \
+            self.pred_dataset.prefetch(self.config['batch_size'] * 3) \
+                             .batch(self.config['batch_size'])
+        self.pred_iterator = self.pred_dataset.make_initializable_iterator()
+        return self.pred_iterator.string_handle()
 
     def data_generator(self, path, train=True):
         files = sorted(os.listdir(path))
