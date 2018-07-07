@@ -138,54 +138,91 @@ class MosaicNet:
         predicted_downsampled_x2_feats = VGG16(input=self.predicted_downsampled_x2)
         predicted_downsampled_x4_feats = VGG16(input=self.predicted_downsampled_x4)
 
+        # Feature scale factors
+        target_conv1_1 = target_feats.conv1_1
+        conv1_1_shape = tf.cast(tf.shape(target_conv1_1), tf.float32)
+        conv1_1_scale = 1.0 / (conv1_1_shape[1] *
+                               conv1_1_shape[2] *
+                               conv1_1_shape[3])
+        target_conv2_1 = target_feats.conv2_1
+        conv2_1_shape = tf.cast(tf.shape(target_conv2_1), tf.float32)
+        conv2_1_scale = 1.0 / (conv2_1_shape[1] *
+                               conv2_1_shape[2] *
+                               conv2_1_shape[3])
+        target_conv3_1 = target_feats.conv3_1
+        conv3_1_shape = tf.cast(tf.shape(target_conv3_1), tf.float32)
+        conv3_1_scale = 1.0 / (conv3_1_shape[1] *
+                               conv3_1_shape[2] *
+                               conv3_1_shape[3])
+        target_conv4_1 = target_feats.conv4_1
+        conv4_1_shape = tf.cast(tf.shape(target_conv4_1), tf.float32)
+        conv4_1_scale = 1.0 / (conv4_1_shape[1] *
+                               conv4_1_shape[2] *
+                               conv4_1_shape[3])
+        target_conv5_1 = target_feats.conv5_1
+        conv5_1_shape = tf.cast(tf.shape(target_conv5_1), tf.float32)
+        conv5_1_scale = 1.0 / (conv5_1_shape[1] *
+                               conv5_1_shape[2] *
+                               conv5_1_shape[3])
+
         # FEATURE RECONSTRUCTION LOSS
         with tf.name_scope('Multi_Scale_MSE'):
             with tf.name_scope('Original_Scale_MSE'):
-                conv1_1_loss = \
+                self.conv1_1_loss = \
                     tf.losses.mean_squared_error(
                         target_feats.conv1_1,
-                        blurred_predicted_feats.conv1_1)
-                conv2_1_loss = \
+                        blurred_predicted_feats.conv1_1) #* \
+                    #conv1_1_scale
+                self.conv2_1_loss = \
                     tf.losses.mean_squared_error(
                         target_feats.conv2_1,
-                        blurred_predicted_feats.conv2_1)
-                conv3_1_loss = \
+                        blurred_predicted_feats.conv2_1) #* \
+                    #conv2_1_scale
+                self.conv3_1_loss = \
                     tf.losses.mean_squared_error(
                         target_feats.conv3_1,
-                        blurred_predicted_feats.conv3_1)
-                conv4_1_loss = \
+                        blurred_predicted_feats.conv3_1) #* \
+                    #conv3_1_scale
+                self.conv4_1_loss = \
                     tf.losses.mean_squared_error(
                         target_feats.conv4_1,
-                        blurred_predicted_feats.conv4_1)
-                conv5_1_loss = \
+                        blurred_predicted_feats.conv4_1) #* \
+                    #conv4_1_scale
+                self.conv5_1_loss = \
                     tf.losses.mean_squared_error(
                         target_feats.conv5_1,
-                        blurred_predicted_feats.conv5_1)
-                original_scale_losses = [conv1_1_loss, conv2_1_loss,
-                                         conv3_1_loss, conv4_1_loss,
-                                         conv5_1_loss]
+                        blurred_predicted_feats.conv5_1) #* \
+                    #conv5_1_scale
+                original_scale_losses = [self.conv1_1_loss, self.conv2_1_loss,
+                                         self.conv3_1_loss, self.conv4_1_loss,
+                                         self.conv5_1_loss]
 
             with tf.name_scope('Downsampled_x2_MSE'):
                 downsampled_x2_conv1_1_loss = \
                     tf.losses.mean_squared_error(
                         target_downsampled_x2_feats.conv1_1,
-                        predicted_downsampled_x2_feats.conv1_1)
+                        predicted_downsampled_x2_feats.conv1_1) #* \
+                    #(conv1_1_scale / 2)
                 downsampled_x2_conv2_1_loss = \
                     tf.losses.mean_squared_error(
                         target_downsampled_x2_feats.conv2_1,
-                        predicted_downsampled_x2_feats.conv2_1)
+                        predicted_downsampled_x2_feats.conv2_1) #* \
+                    #(conv2_1_scale / 2)
                 downsampled_x2_conv3_1_loss = \
                     tf.losses.mean_squared_error(
                         target_downsampled_x2_feats.conv3_1,
-                        predicted_downsampled_x2_feats.conv3_1)
+                        predicted_downsampled_x2_feats.conv3_1) #* \
+                    #(conv3_1_scale / 2)
                 downsampled_x2_conv4_1_loss = \
                     tf.losses.mean_squared_error(
                         target_downsampled_x2_feats.conv4_1,
-                        predicted_downsampled_x2_feats.conv4_1)
+                        predicted_downsampled_x2_feats.conv4_1) #* \
+                    #(conv4_1_scale / 2)
                 downsampled_x2_conv5_1_loss = \
                     tf.losses.mean_squared_error(
                         target_downsampled_x2_feats.conv5_1,
-                        predicted_downsampled_x2_feats.conv5_1)
+                        predicted_downsampled_x2_feats.conv5_1) #* \
+                    #(conv5_1_scale / 2)
                 downsampled_x2_losses = [downsampled_x2_conv1_1_loss,
                                          downsampled_x2_conv2_1_loss,
                                          downsampled_x2_conv3_1_loss,
@@ -196,23 +233,28 @@ class MosaicNet:
                 downsampled_x4_conv1_1_loss = \
                     tf.losses.mean_squared_error(
                         target_downsampled_x4_feats.conv1_1,
-                        predicted_downsampled_x4_feats.conv1_1)
+                        predicted_downsampled_x4_feats.conv1_1) #* \
+                    #(conv1_1_scale / 4)
                 downsampled_x4_conv2_1_loss = \
                     tf.losses.mean_squared_error(
                         target_downsampled_x4_feats.conv2_1,
-                        predicted_downsampled_x4_feats.conv2_1)
+                        predicted_downsampled_x4_feats.conv2_1) #* \
+                    #(conv2_1_scale / 4)
                 downsampled_x4_conv3_1_loss = \
                     tf.losses.mean_squared_error(
                         target_downsampled_x4_feats.conv3_1,
-                        predicted_downsampled_x4_feats.conv3_1)
+                        predicted_downsampled_x4_feats.conv3_1) #* \
+                    #(conv3_1_scale / 4)
                 downsampled_x4_conv4_1_loss = \
                     tf.losses.mean_squared_error(
                         target_downsampled_x4_feats.conv4_1,
-                        predicted_downsampled_x4_feats.conv4_1)
+                        predicted_downsampled_x4_feats.conv4_1) #* \
+                    #(conv4_1_scale / 4)
                 downsampled_x4_conv5_1_loss = \
                     tf.losses.mean_squared_error(
                         target_downsampled_x4_feats.conv5_1,
-                        predicted_downsampled_x4_feats.conv5_1)
+                        predicted_downsampled_x4_feats.conv5_1) #* \
+                    #(conv5_1_scale / 4)
                 downsampled_x4_losses = [downsampled_x4_conv1_1_loss,
                                          downsampled_x4_conv2_1_loss,
                                          downsampled_x4_conv3_1_loss,
@@ -220,9 +262,9 @@ class MosaicNet:
                                          downsampled_x4_conv5_1_loss]
 
         return \
-            tf.add_n(original_scale_losses) + \
-            tf.add_n(downsampled_x2_losses) + \
-            tf.add_n(downsampled_x4_losses)
+            (tf.add_n(original_scale_losses) +
+            tf.add_n(downsampled_x2_losses) +
+            tf.add_n(downsampled_x4_losses)) / tf.to_float(self.batch_size, tf.float32)
 
     def build_summaries(self):
         with tf.name_scope('Summaries'):
@@ -238,11 +280,16 @@ class MosaicNet:
             tf.summary.scalar('variance', VarianceLayer(self.softmax, num_bins=self.num_templates))
             tf.summary.scalar('temperature', self.temperature)
             tf.summary.scalar('train_loss', self.loss)
+            tf.summary.scalar('conv1_1_loss', self.conv1_1_loss)
+            tf.summary.scalar('conv2_1_loss', self.conv2_1_loss)
+            tf.summary.scalar('conv3_1_loss', self.conv3_1_loss)
+            tf.summary.scalar('conv4_1_loss', self.conv4_1_loss)
+            tf.summary.scalar('conv5_1_loss', self.conv5_1_loss)
             self.val_loss_summary = tf.summary.scalar('validation_loss', self.val_loss, collections=['val'])
             self.summaries = tf.summary.merge_all()
 
     def train(self):
-        opt = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate)
+        opt = tf.train.MomentumOptimizer(self.learning_rate, momentum=0.9)
         train_step = opt.minimize(self.loss)
 
         saver = tf.train.Saver(max_to_keep=0, pad_step_number=16)
