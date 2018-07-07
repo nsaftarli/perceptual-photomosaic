@@ -6,7 +6,6 @@ acc.txt
 ferrari-gtc4lusso.jpg
 hyundai-verna.jpg
 mercedes-amg-glc-43-coupe.jpg
-snapshots/
 weights/
 
 #Off-the-shelf ascii generator
@@ -18,7 +17,6 @@ assets/
 __pycache__/
 weights/
 viz/
-snapshots/
 
 #Compiled python and existing models
 *.pyc
@@ -29,14 +27,18 @@ snapshots/
 *.png
 *.mov
 *.mp4
+
 #Test files
 tst.py
 
 #Logs
-logs/
-*.log
 experiments/
 
 #Settings
 constants.py
+
+._*
+.DS_Store
+
+notes/
 

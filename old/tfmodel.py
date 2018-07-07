@@ -38,18 +38,19 @@ w = tf.reshape(tf.constant(gauss2d_kernel(shape=(patch_size, patch_size), sigma=
                [patch_size, patch_size, 1, 1])
 
 
-class ASCIINet:
+class MosaicNet:
 
     def __init__(self,
                  images,
                  templates,
                  weight_path='./weights/vgg16.npy',
-                 batch_size=6,
+                 batch_size=8,
                  trainable=True,
-                 rgb=False):
-        self.net = self.build_network(images, templates, batch_size=batch_size, trainable=trainable, rgb=rgb)
+                 rgb=False,
+                 inference=False):
+        self.net = self.build_network(images, templates, batch_size=batch_size, trainable=trainable, rgb=rgb, inference=inference)
 
-    def build_network(self, input, templates, batch_size, trainable, rgb):
+    def build_network(self, input, templates, batch_size, trainable, rgb, inference):
 
         self.input = input
 
@@ -75,7 +76,7 @@ class ASCIINet:
             self.conv9, _ = ConvLayer(self.conv8, name='conv9', ksize=1, stride=1, out_channels=256,  norm_type=norm_type, trainable=trainable)
             self.conv10, _ = ConvLayer(self.conv9, name='conv10', ksize=1, stride=1, out_channels=128,  norm_type=norm_type, trainable=trainable)
             self.conv11, _ = ConvLayer(self.conv10, name='conv11', ksize=1, stride=1, out_channels=64,  norm_type=norm_type, trainable=trainable)
-            self.conv12, _ = ConvLayer(self.conv11, name='conv12', ksize=1, stride=1, out_channels=NUM_TEMPLATES,  norm_type=norm_type, trainable=trainable, layer_type='Softmax')
+            self.conv12, _ = ConvLayer(self.conv11, name='conv12', ksize=1, stride=1, out_channels=NUM_TEMPLATES,  norm_type='layer', trainable=trainable, layer_type='Softmax')
 
         # ################Other Inputs#############################################################################
         self.temp = tf.placeholder(tf.float32, shape=[])
@@ -87,6 +88,7 @@ class ASCIINet:
             g = tf.expand_dims(self.g, axis=3)
             b = tf.expand_dims(self.b, axis=3)
         self.temps = tf.concat([r, g, b], axis=3)
+        print(self.temps.get_shape())
         # #################Colour templates##############################
         self.r = tf.transpose(tf.reshape(self.r, [-1, patch_size ** 2, NUM_TEMPLATES]), perm=[0, 2, 1])
         self.r = tf.tile(self.r, [batch_size, 1, 1])
@@ -101,9 +103,11 @@ class ASCIINet:
 
         # ###############Softmax###################################################################################
         self.softmax = tf.nn.softmax(self.conv12 * self.temp)
-        self.softmax_size = self.softmax.get_shape().as_list()[1]
-        self.reshaped_softmax = tf.reshape(self.softmax,[-1, self.softmax_size ** 2, NUM_TEMPLATES])
+        self.softmax_h = self.softmax.get_shape().as_list()[1]
+        self.softmax_w = self.softmax.get_shape().as_list()[2]
+        self.reshaped_softmax = tf.reshape(self.softmax,[-1, self.softmax_h * self.softmax_w, NUM_TEMPLATES])
         print('****************************')
+        print(self.softmax_h,self.softmax_w)
         print(self.softmax.get_shape())
         print(self.r.get_shape())
         print(self.reshaped_softmax.get_shape())
@@ -115,18 +119,18 @@ class ASCIINet:
             self.output_r = tf.matmul(self.reshaped_softmax, self.r)
             print(self.output_r.get_shape())
             self.output_r = tf.reshape(tf.transpose(tf.reshape(
-                self.output_r, [batch_size, self.softmax_size, self.softmax_size, patch_size, patch_size]),
-                perm=[0, 1, 3, 2, 4]), [batch_size, img_new_size, img_new_size, 1])
+                self.output_r, [batch_size, self.softmax_h, self.softmax_w, patch_size, patch_size]),
+                perm=[0, 1, 3, 2, 4]), [batch_size, 376 * 2, img_new_size * 2, 1])
 
             self.output_g = tf.matmul(self.reshaped_softmax, self.g)
             self.output_g = tf.reshape(tf.transpose(tf.reshape(
-                self.output_g, [batch_size, self.softmax_size, self.softmax_size, patch_size, patch_size]),
-                perm=[0, 1, 3, 2, 4]), [batch_size, img_new_size, img_new_size, 1])
+                self.output_g, [batch_size, self.softmax_h, self.softmax_w, patch_size, patch_size]),
+                perm=[0, 1, 3, 2, 4]), [batch_size, 376 * 2, img_new_size * 2, 1])
 
             self.output_b = tf.matmul(self.reshaped_softmax, self.b)
             self.output_b = tf.reshape(tf.transpose(tf.reshape(
-                self.output_b, [batch_size, self.softmax_size, self.softmax_size, patch_size, patch_size]),
-                perm=[0, 1, 3, 2, 4]), [batch_size, img_new_size, img_new_size, 1])
+                self.output_b, [batch_size, self.softmax_h, self.softmax_w, patch_size, patch_size]),
+                perm=[0, 1, 3, 2, 4]), [batch_size, 376 * 2, img_new_size * 2, 1])
 
         with tf.name_scope('soft_output'):
             self.view_output = tf.concat([self.output_r, self.output_g, self.output_b], axis=3)
@@ -135,42 +139,42 @@ class ASCIINet:
             self.blurred_out = self.blur_recombine(self.view_output, w, stride=1)
 
         ##########################################################################################################
+        if not inference:
+            ################Gaussian Pyramid###########################################################################
+            self.in_d1 = self.blur_recombine(self.input, w, stride=2)
+            self.in_d2 = self.blur_recombine(self.in_d1, w, stride=2)
+            self.out_d1 = self.blur_recombine(self.blurred_out, w, stride=2)
+            self.out_d2 = self.blur_recombine(self.out_d1, w, stride=2)
 
-        ################Gaussian Pyramid###########################################################################
-        self.in_d1 = self.blur_recombine(self.input, w, stride=2)
-        self.in_d2 = self.blur_recombine(self.in_d1, w, stride=2)
-        self.out_d1 = self.blur_recombine(self.blurred_out, w, stride=2)
-        self.out_d2 = self.blur_recombine(self.out_d1, w, stride=2)
+            # ##############Loss and Regularizers######################################################################
+            with tf.name_scope('multiscale_structure_features'):
+                self.vgg2 = VGG16(input=self.blurred_out, trainable=False)
 
-        # ##############Loss and Regularizers######################################################################
-        with tf.name_scope('multiscale_structure_features'):
-            self.vgg2 = VGG16(input=self.blurred_out, trainable=False)
+                self.vgg_in_d1 = VGG16(input=self.in_d1, trainable=False)
+                self.vgg_in_d2 = VGG16(input=self.in_d2, trainable=False)
+                self.vgg_out_d1 = VGG16(input=self.out_d1, trainable=False)
+                self.vgg_out_d2 = VGG16(input=self.out_d2, trainable=False)
 
-            self.vgg_in_d1 = VGG16(input=self.in_d1, trainable=False)
-            self.vgg_in_d2 = VGG16(input=self.in_d2, trainable=False)
-            self.vgg_out_d1 = VGG16(input=self.out_d1, trainable=False)
-            self.vgg_out_d2 = VGG16(input=self.out_d2, trainable=False)
+            ################Structure Loss############################################################################
+            self.f_loss1 = tf.losses.mean_squared_error(self.encoder.conv1_1, self.vgg2.conv1_1)
+            self.f_loss2 = tf.losses.mean_squared_error(self.encoder.conv2_1, self.vgg2.conv2_1)
+            self.f_loss3 = tf.losses.mean_squared_error(self.encoder.conv3_1, self.vgg2.conv3_1)
+            self.f_loss4 = tf.losses.mean_squared_error(self.encoder.conv4_1, self.vgg2.conv4_1)
+            self.f_loss5 = tf.losses.mean_squared_error(self.encoder.conv5_1, self.vgg2.conv5_1)
 
-        ################Structure Loss############################################################################
-        self.f_loss1 = tf.losses.mean_squared_error(self.encoder.conv1_1, self.vgg2.conv1_1)
-        self.f_loss2 = tf.losses.mean_squared_error(self.encoder.conv2_1, self.vgg2.conv2_1)
-        self.f_loss3 = tf.losses.mean_squared_error(self.encoder.conv3_1, self.vgg2.conv3_1)
-        self.f_loss4 = tf.losses.mean_squared_error(self.encoder.conv4_1, self.vgg2.conv4_1)
-        self.f_loss5 = tf.losses.mean_squared_error(self.encoder.conv5_1, self.vgg2.conv5_1)
+            self.blur_loss = (tf.losses.mean_squared_error(self.vgg_in_d1.conv1_1, self.vgg_out_d1.conv1_1)) + \
+                             (tf.losses.mean_squared_error(self.vgg_in_d2.conv1_1, self.vgg_out_d2.conv1_1)) + \
+                             (tf.losses.mean_squared_error(self.vgg_in_d1.conv2_1, self.vgg_out_d1.conv2_1)) + \
+                             (tf.losses.mean_squared_error(self.vgg_in_d2.conv2_1, self.vgg_out_d2.conv2_1))
 
-        self.blur_loss = (tf.losses.mean_squared_error(self.vgg_in_d1.conv1_1, self.vgg_out_d1.conv1_1)) + \
-                         (tf.losses.mean_squared_error(self.vgg_in_d2.conv1_1, self.vgg_out_d2.conv1_1)) + \
-                         (tf.losses.mean_squared_error(self.vgg_in_d1.conv2_1, self.vgg_out_d1.conv2_1)) + \
-                         (tf.losses.mean_squared_error(self.vgg_in_d2.conv2_1, self.vgg_out_d2.conv2_1))
+            self.structure_loss = self.f_loss1 + self.f_loss2 + self.f_loss3 #+ self.f_loss4 + self.f_loss5 #+ self.blur_loss
+            ###########################################################################################################
+            self.tLoss = self.structure_loss + self.blur_loss
+            ##########################################################################################################
 
-        self.structure_loss = self.f_loss1 + self.f_loss2 + self.f_loss3 + self.f_loss4 + self.f_loss5 #+ self.blur_loss
-        ###########################################################################################################
-        self.tLoss = self.structure_loss + self.blur_loss
-        ##########################################################################################################
-
-        self.entropy = EntropyRegularizer(self.softmax) * 1e3
-        self.variance = VarianceRegularizer(self.softmax, num_temps=NUM_TEMPLATES) * 1e2
-        self.build_summaries()
+            self.entropy = EntropyRegularizer(self.softmax) * 1e3
+            self.variance = VarianceRegularizer(self.softmax, num_temps=NUM_TEMPLATES) * 1e2
+            self.build_summaries()
 
 
     def get_avg_colour(self, input):
