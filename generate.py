@@ -13,15 +13,15 @@ parser.add_argument('-g', '--gpu', default=1, type=int)
 parser.add_argument('-b', '--batch_size', default=6, type=int)
 parser.add_argument('-i', '--iterations', default=5000, type=int)
 parser.add_argument('-tr', '--train', default='True', type=str)
-parser.add_argument('-lr', '--learning_rate', default=1e-6, type=float)
+parser.add_argument('-lr', '--learning_rate', default=6e-6, type=float)
 parser.add_argument('-t', '--init_temperature', default=1.0, type=float)
 parser.add_argument('-n', '--notes', default=None, type=str)
 parser.add_argument('-logf', '--log_freq', default=10, type=int)
 parser.add_argument('-printf', '--print_freq', default=10, type=int)
 parser.add_argument('-chkpt', '--chkpt_freq', default=500, type=int)
 parser.add_argument('-valf', '--val_freq', default=500, type=int)
-parser.add_argument('-tpath', '--train_path', default='data/coco_resized_512_train/', type=str)
-parser.add_argument('-vpath', '--val_path', default='data/coco_resized_512_val/', type=str)
+parser.add_argument('-tpath', '--train_path', default='data/datasets/coco_resized_512_train/', type=str)
+parser.add_argument('-vpath', '--val_path', default='data/datasets/coco_resized_512_val/', type=str)
 parser.add_argument('-mpath', '--model_path', default='data/models/MODEL_FOLDER/', type=str)
 parser.add_argument('-ppath', '--predict_path', default='data/PREDICT_PATH', type=str)
 parser.add_argument('-folder', '--template_folder', default='black_ascii_8', type=str)
@@ -71,7 +71,7 @@ d = Dataset(training_path=train_path,
             validation_path=val_path,
             prediction_path=predict_path,
             config=my_config)
-templates = get_templates(path='data/' + template_folder + '/')
+templates = get_templates(path='data/templates/' + template_folder + '/')
 
 
 # BUILD GRAPH
