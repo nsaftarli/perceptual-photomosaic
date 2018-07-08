@@ -254,7 +254,7 @@ class MosaicNet:
         return \
             (tf.add_n(original_scale_losses) +
             tf.add_n(downsampled_x2_losses) +
-            tf.add_n(downsampled_x4_losses)) / tf.to_float(self.batch_size, tf.float32)
+            tf.add_n(downsampled_x4_losses)) / tf.to_float(self.batch_size)
 
     def build_summaries(self):
         with tf.name_scope('Summaries'):
