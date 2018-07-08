@@ -16,14 +16,14 @@ class Dataset:
         self.handle = tf.placeholder(tf.string, shape=[])
         self.iterator = tf.data.Iterator.from_string_handle(self.handle, (tf.float32, tf.int32, tf.int32))
 
-        train_generator = self.data_generator_gpu(self.train_path)
+        train_generator = self.data_generator(self.train_path)
         self.train_dataset = tf.data.Dataset.from_tensor_slices(train_generator)
 
-        val_generator = self.data_generator_gpu(self.val_path)
+        val_generator = self.data_generator(self.val_path)
         self.val_dataset = tf.data.Dataset.from_tensor_slices(val_generator)
 
         if not config['train']:
-            pred_generator = self.data_generator_gpu(self.pred_path)
+            pred_generator = self.data_generator(self.pred_path)
             self.pred_dataset = tf.data.Dataset.from_tensor_slices(pred_generator)
 
 
@@ -51,7 +51,7 @@ class Dataset:
         self.pred_iterator = self.pred_dataset.make_initializable_iterator()
         return self.pred_iterator.string_handle()
 
-    def data_generator_gpu(self, path):
+    def data_generator(self, path):
         filenames = [os.path.join(path, f) for f in sorted(os.listdir(path))]
         num_files = len(filenames)
         indices = list(range(num_files))
