@@ -64,15 +64,3 @@ def get_templates(path):
         images.append(im)
     images = np.expand_dims(np.stack(images, axis=-1), axis=0)
     return images
-
-
-# Move to utils
-def turn_im_into_templates(path, patch_size=8):
-    im = imread(path)
-    x = 0
-    for i in range(im.shape[0] // patch_size):
-        for j in range(im.shape[1] // patch_size):
-            patch = im[i*patch_size:i*(patch_size+1), j*patch_size:j*(patch_size+1), :]
-            out = Image.fromarray(patch.astype('uint8'))
-            out.save('./assets/cam_templates_2/' + str(x) + '.png', 'PNG')
-            x += 1
