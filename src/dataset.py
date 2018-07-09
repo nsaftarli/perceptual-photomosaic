@@ -28,7 +28,7 @@ class Dataset:
             self.pred_dataset = tf.data.Dataset.from_tensor_slices(pred_generator)
 
         # for data transformations
-        self.num_cores = multiprocessing.cpu_count() / 2
+        self.num_cores = multiprocessing.cpu_count() // 2
         self.buffer_size = 10000
 
     def get_training_handle(self):
