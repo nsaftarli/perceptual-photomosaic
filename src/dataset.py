@@ -4,6 +4,7 @@ import numpy as np
 import tensorflow as tf
 import itertools
 from scipy.misc import imread
+import multiprocessing
 
 
 class Dataset:
@@ -26,28 +27,37 @@ class Dataset:
             pred_generator = self.data_generator(self.pred_path)
             self.pred_dataset = tf.data.Dataset.from_tensor_slices(pred_generator)
 
+        # for data transformations
+        self.num_cores = multiprocessing.cpu_count() / 2
+        self.buffer_size = 10000
 
     def get_training_handle(self):
-        self.train_dataset = \
-            self.train_dataset.map(self.read_file) \
-                              .prefetch(self.config['batch_size'] * 3) \
-                              .batch(self.config['batch_size'])
+        shuffle_and_repeat = tf.contrib.data.shuffle_and_repeat
+        map_and_batch = tf.contrib.data.map_and_batch
+        self.train_dataset = self.train_dataset \
+            .apply(shuffle_and_repeat(buffer_size=self.buffer_size,
+                                      count=None)) \
+            .apply(map_and_batch(self.read_file, self.config['batch_size'],
+                                 num_parallel_batches=self.num_cores)) \
+            .prefetch(1)
         self.train_iterator = self.train_dataset.make_one_shot_iterator()
         return self.train_iterator.string_handle()
 
     def get_validation_handle(self):
-        self.val_dataset = \
-            self.val_dataset.map(self.read_file) \
-                            .prefetch(self.config['batch_size'] * 3) \
-                            .batch(self.config['batch_size'])
+        map_and_batch = tf.contrib.data.map_and_batch
+        self.val_dataset = self.val_dataset \
+            .apply(map_and_batch(self.read_file, self.config['batch_size'],
+                                 num_parallel_batches=self.num_cores)) \
+            .prefetch(1)
         self.val_iterator = self.val_dataset.make_initializable_iterator()
         return self.val_iterator.string_handle()
 
     def get_prediction_handle(self):
-        self.pred_dataset = \
-            self.pred_dataset.map(self.read_file) \
-                             .prefetch(self.config['batch_size'] * 3) \
-                             .batch(self.config['batch_size'])
+        map_and_batch = tf.contrib.data.map_and_batch
+        self.pred_dataset = self.pred_dataset \
+            .apply(map_and_batch(self.read_file, self.config['batch_size'],
+                                 num_parallel_batches=self.num_cores)) \
+            .prefetch(1)
         self.pred_iterator = self.pred_dataset.make_initializable_iterator()
         return self.pred_iterator.string_handle()
 
@@ -66,8 +76,6 @@ class Dataset:
                                                           channels=3))
         image_decoded.set_shape([None, None, 3])
         return image_decoded, index, num_files
-
-
 
 
 def get_templates(path):
