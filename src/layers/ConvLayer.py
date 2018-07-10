@@ -13,7 +13,7 @@ def ConvLayer(input, name, out_channels, ksize=3, stride=1, activation='leaky_re
 
         if activation is not None:
             z = GroupNormLayer(z, name + '/Group_Norm', G=2)
-            z = tf.nn.leaky_relu(z)
+            z = tf.nn.relu(z)
         else:
             z = GroupNormLayer(z, name + '/Group_Norm', G=1)
 
