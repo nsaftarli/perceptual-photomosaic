@@ -43,18 +43,13 @@ class MosaicNet:
 
         # DECODER
         with tf.name_scope('Decoder'):
-            self.conv6 = ConvLayer(self.decoder_in, 'conv6', 4096, 1, trainable=trainable)
-            self.conv7 = ConvLayer(self.conv6, 'conv7', 1024, 1, trainable=trainable)
-            self.conv8 = ConvLayer(self.conv7, 'conv8', 512, 1, trainable=trainable)
-            self.conv9 = ConvLayer(self.conv8, 'conv9', 256, 1, trainable=trainable)
-            self.conv10 = ConvLayer(self.conv9, 'conv10', 128, 1, trainable=trainable)
-            self.conv11 = ConvLayer(self.conv10, 'conv11', 64, 1, trainable=trainable)
-            self.conv12 = ConvLayer(self.conv11, 'conv12', self.num_templates, 1, activation=None, trainable=trainable)
+            self.conv6 = ConvLayer(self.decoder_in, 'conv6', 256, 1, trainable=trainable)
+            self.conv7 = ConvLayer(self.conv6, 'conv7', self.num_templates, 3, activation=None, trainable=trainable)
 
         # Computing template coefficients
         with tf.name_scope('Coefficient_Calculation'):
             # (B, H/H_T, W/W_T, N_T)
-            self.softmax = tf.nn.softmax(self.conv12 * self.temperature)
+            self.softmax = tf.nn.softmax(self.conv7 * self.temperature)
             softmax_shape = tf.shape(self.softmax)
             self.softmax_h, self.softmax_w = (softmax_shape[1], softmax_shape[2])
             # (B, (H/H_T) * (W/W_T), N_T)
@@ -305,9 +300,9 @@ class MosaicNet:
             learning_rate = self.my_config['learning_rate']
             for i in range(iterations_so_far, self.my_config['iterations']):
                 # Temperature Schedule
-                if i > 1 and i % 1000 == 0:
+                if i > 1 and i % 10 == 0:
                     if i < 8000:
-                        temperature *= 2
+                        temperature *= 1.02
 
                 train_feed_dict = {self.learning_rate: learning_rate,
                                    self.temperature: temperature,
