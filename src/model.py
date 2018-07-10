@@ -298,11 +298,15 @@ class MosaicNet:
             val_handle = sess.run(self.dataset.get_validation_handle())
             temperature = self.my_config['init_temperature']
             learning_rate = self.my_config['learning_rate']
+
+            temp_schedule = temperature_schedule(temperature, 15, 10,
+                                                 self.dataset.train_dataset_size,
+                                                 self.my_config['batch_size'])
+
             for i in range(iterations_so_far, self.my_config['iterations']):
-                # Temperature Schedule
-                if i > 1 and i % 10 == 0:
-                    if i < 8000:
-                        temperature *= 1.02
+                # Temperature Schedule (Linear)
+                if i % 10 == 0:
+                    temperature += temp_schedule
 
                 train_feed_dict = {self.learning_rate: learning_rate,
                                    self.temperature: temperature,

@@ -20,11 +20,11 @@ class Dataset:
         train_generator = self.data_generator(self.train_path)
         self.train_dataset = tf.data.Dataset.from_tensor_slices(train_generator)
 
-        val_generator = self.data_generator(self.val_path)
+        val_generator = self.data_generator(self.val_path, train=False)
         self.val_dataset = tf.data.Dataset.from_tensor_slices(val_generator)
 
         if not config['train']:
-            pred_generator = self.data_generator(self.pred_path)
+            pred_generator = self.data_generator(self.pred_path, train=False)
             self.pred_dataset = tf.data.Dataset.from_tensor_slices(pred_generator)
 
         # for data transformations
@@ -61,9 +61,11 @@ class Dataset:
         self.pred_iterator = self.pred_dataset.make_initializable_iterator()
         return self.pred_iterator.string_handle()
 
-    def data_generator(self, path):
+    def data_generator(self, path, train=True):
         filenames = [os.path.join(path, f) for f in sorted(os.listdir(path))]
         num_files = len(filenames)
+        if train:
+            self.train_dataset_size = num_files
         indices = list(range(num_files))
         filenames = tf.constant(filenames)
         num_files = tf.constant([num_files] * num_files)
