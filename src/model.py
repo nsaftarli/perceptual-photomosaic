@@ -209,56 +209,76 @@ class MosaicNet:
             pyramid_target_feats.append(target_feats)
 
         # Compute feature reconstruction losses at each layer and pyramid scale
-        losses = []
-        i = 0
-        for scales_at_layer in downscale_factors:
-            layer = layers[i]
-            losses_at_layer = []
-            for scale in scales_at_layer:
-                # Get index
-                index = np.where(scales == scale)[0][0]
+        with tf.name_scope('Feature_Reconstruction_Loss'):
+            losses = []
+            i = 0
+            for scales_at_layer in downscale_factors:
+                layer = layers[i]
+                losses_at_layer = []
+                for scale in scales_at_layer:
+                    # Get index
+                    index = np.where(scales == scale)[0][0]
 
-                predicted_layer = getattr(pyramid_predicted_feats[index], layer)
-                target_layer = getattr(pyramid_target_feats[index], layer)
+                    predicted_layer = getattr(pyramid_predicted_feats[index],
+                                              layer)
+                    target_layer = getattr(pyramid_target_feats[index], layer)
 
-                # Append feature reconstruction loss
-                loss_layer = \
-                    tf.losses.mean_squared_error(target_layer, predicted_layer)
-                losses_at_layer.append(loss_layer)
+                    # Append feature reconstruction loss
+                    loss_layer = \
+                        tf.losses.mean_squared_error(target_layer,
+                                                     predicted_layer)
+                    losses_at_layer.append(loss_layer)
 
-            # Add together losses at all scales in this layer
-            loss_at_layer = tf.add_n(loss_at_layer)
+                # Append to list of all losses at all scales and layers
+                losses.append(losses_at_layer)
 
-            # Weight the loss at this layer and average across scales
-            loss_at_layer *= (layer_scale_factors[i] / len(scales_at_layer))
+                i += 1
 
-            # Append to final losses list
-            losses.append(loss_at_layer)
+            # Add together losses at chosen scales for each layer
+            loss_at_layer = []
+            i = 0
+            for losses_at_layer in losses:
+                loss = tf.add_n(losses_at_layer)
 
-            i += 1
+                # Weight the total loss at this layer and average across scales
+                loss *= (layer_scale_factors[i] / len(losses_at_layer))
 
-        # Add all losses together
-        return tf.add_n(losses)
+                # Append to list of scale-averaged and user-weighted losses at
+                # each layer
+                loss_at_layer.append(loss)
+
+                i += 1
+
+            # Add together losses at all layers
+            final_loss = tf.add_n(loss_at_layer)
+
+        # For usage in summary
+        self.losses = losses
+        self.loss_at_layer = loss_at_layer
+        self.pyramid_predicted = pyramid_predicted
+        self.pyramid_target = pyramid_target
+
+        return final_loss
 
     def build_summaries(self):
         with tf.name_scope('Summaries'):
             tf.summary.image('target', tf.cast(self.input, tf.uint8), max_outputs=6)
-            tf.summary.image('target_downsampled_x2', tf.cast(self.target_downsampled_x2, tf.uint8), max_outputs=6)
-            tf.summary.image('target_downsampled_x4', tf.cast(self.target_downsampled_x4, tf.uint8), max_outputs=6)
+            tf.summary.image('target_downsampled_x2', tf.cast(self.pyramid_target[1], tf.uint8), max_outputs=6)
+            tf.summary.image('target_downsampled_x4', tf.cast(self.pyramid_target[2], tf.uint8), max_outputs=6)
             tf.summary.image('soft_output', tf.cast(self.soft_output, tf.uint8), max_outputs=6)
-            tf.summary.image('blurred_predicted', tf.cast(self.blurred_predicted, tf.uint8), max_outputs=6)
-            tf.summary.image('predicted_downsampled_x2', tf.cast(self.predicted_downsampled_x2, tf.uint8), max_outputs=6)
-            tf.summary.image('predicted_downsampled_x4', tf.cast(self.predicted_downsampled_x4, tf.uint8), max_outputs=6)
+            tf.summary.image('blurred_predicted', tf.cast(self.pyramid_predicted[0], tf.uint8), max_outputs=6)
+            tf.summary.image('predicted_downsampled_x2', tf.cast(self.pyramid_predicted[1], tf.uint8), max_outputs=6)
+            tf.summary.image('predicted_downsampled_x4', tf.cast(self.pyramid_predicted[2], tf.uint8), max_outputs=6)
             tf.summary.image('hard_output', tf.cast(self.hard_output, tf.uint8), max_outputs=6)
             tf.summary.scalar('entropy', EntropyLayer(self.softmax))
             tf.summary.scalar('variance', VarianceLayer(self.softmax, num_bins=self.num_templates))
             tf.summary.scalar('temperature', self.temperature)
             tf.summary.scalar('train_loss', self.loss)
-            tf.summary.scalar('conv1_1_loss', self.conv1_1_loss)
-            tf.summary.scalar('conv2_1_loss', self.conv2_1_loss)
-            tf.summary.scalar('conv3_1_loss', self.conv3_1_loss)
-            tf.summary.scalar('conv4_1_loss', self.conv4_1_loss)
-            tf.summary.scalar('conv5_1_loss', self.conv5_1_loss)
+            tf.summary.scalar('conv1_1_loss', self.loss_at_layer[0])
+            tf.summary.scalar('conv2_1_loss', self.loss_at_layer[1])
+            tf.summary.scalar('conv3_1_loss', self.loss_at_layer[2])
+            tf.summary.scalar('conv4_1_loss', self.loss_at_layer[3])
+            tf.summary.scalar('conv5_1_loss', self.loss_at_layer[4])
             self.val_loss_summary = tf.summary.scalar('validation_loss', self.val_loss, collections=['val'])
             self.summaries = tf.summary.merge_all()
 
