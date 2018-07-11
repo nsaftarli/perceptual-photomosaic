@@ -301,7 +301,7 @@ class MosaicNet:
 
             temp_schedule = temperature_schedule(temperature, 15, 10,
                                                  self.dataset.train_dataset_size,
-                                                 self.my_config['batch_size'])
+                                                 self.my_config['train_batch_size'])
 
             for i in range(iterations_so_far, self.my_config['iterations']):
                 # Temperature Schedule (Linear)

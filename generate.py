@@ -10,7 +10,9 @@ from src.utils import slack_notify
 # COMMAND LINE ARGS
 parser = argparse.ArgumentParser(description='training')
 parser.add_argument('-g', '--gpu', default=1, type=int)
-parser.add_argument('-b', '--batch_size', default=6, type=int)
+parser.add_argument('-tb', '--train_batch_size', default=6, type=int)
+parser.add_argument('-vb', '--val_batch_size', default=None, type=int)
+parser.add_argument('-pb', '--pred_batch_size', default=None, type=int)
 parser.add_argument('-i', '--iterations', default=5000, type=int)
 parser.add_argument('-tr', '--train', default='True', type=str)
 parser.add_argument('-lr', '--learning_rate', default=6e-6, type=float)
@@ -30,7 +32,9 @@ args = parser.parse_args()
 
 # SETTINGS
 my_config = {}
-my_config['batch_size'] = args.batch_size
+my_config['train_batch_size'] = args.train_batch_size
+my_config['val_batch_size'] = args.val_batch_size if (args.val_batch_size is not None) else args.train_batch_size
+my_config['pred_batch_size'] = args.pred_batch_size if (args.pred_batch_size is not None) else args.train_batch_size
 my_config['train'] = True if (args.train == 'True') else False
 my_config['learning_rate'] = args.learning_rate
 my_config['init_temperature'] = args.init_temperature
@@ -44,7 +48,6 @@ my_config['iterations'] = args.iterations
 
 # For Simplicity
 gpu = args.gpu
-batch_size = args.batch_size
 iterations = args.iterations
 train = True if (args.train == 'True') else False
 base_lr = args.learning_rate
