@@ -256,6 +256,8 @@ class MosaicNet:
             final_loss /= len(layers)
 
         # For usage in summary
+        self.layers = layers
+        self.scales = scales
         self.losses = losses
         self.loss_at_layer = loss_at_layer
         self.pyramid_predicted = pyramid_predicted
@@ -265,24 +267,49 @@ class MosaicNet:
 
     def build_summaries(self):
         with tf.name_scope('Summaries'):
-            tf.summary.image('target', tf.cast(self.input, tf.uint8), max_outputs=6)
-            tf.summary.image('target_downsampled_x2', tf.cast(self.pyramid_target[1], tf.uint8), max_outputs=6)
-            tf.summary.image('target_downsampled_x4', tf.cast(self.pyramid_target[2], tf.uint8), max_outputs=6)
-            tf.summary.image('soft_output', tf.cast(self.soft_output, tf.uint8), max_outputs=6)
-            tf.summary.image('blurred_predicted', tf.cast(self.pyramid_predicted[0], tf.uint8), max_outputs=6)
-            tf.summary.image('predicted_downsampled_x2', tf.cast(self.pyramid_predicted[1], tf.uint8), max_outputs=6)
-            tf.summary.image('predicted_downsampled_x4', tf.cast(self.pyramid_predicted[2], tf.uint8), max_outputs=6)
-            tf.summary.image('hard_output', tf.cast(self.hard_output, tf.uint8), max_outputs=6)
-            tf.summary.scalar('entropy', EntropyLayer(self.softmax))
-            tf.summary.scalar('variance', VarianceLayer(self.softmax, num_bins=self.num_templates))
-            tf.summary.scalar('temperature', self.temperature)
-            tf.summary.scalar('train_loss', self.loss)
-            tf.summary.scalar('conv1_1_loss', self.loss_at_layer[0])
-            tf.summary.scalar('conv2_1_loss', self.loss_at_layer[1])
-            tf.summary.scalar('conv3_1_loss', self.loss_at_layer[2])
-            tf.summary.scalar('conv4_1_loss', self.loss_at_layer[3])
-            tf.summary.scalar('conv5_1_loss', self.loss_at_layer[4])
-            self.val_loss_summary = tf.summary.scalar('validation_loss', self.val_loss, collections=['val'])
+            # Summary of gaussian pyramid of target and predicted
+            for s in self.scales:
+                if s == 0:
+                    tf.summary.image('Target', tf.cast(self.input, tf.uint8),
+                                     max_outputs=6)
+                    tf.summary.image('Blurred_Predicted',
+                                     tf.cast(self.pyramid_predicted[0],
+                                             tf.uint8),
+                                     max_outputs=6)
+                    continue
+
+                index = np.where(self.scales == s)[0][0]
+                images_target = tf.cast(self.pyramid_target[index], tf.uint8)
+                images_pred = tf.cast(self.pyramid_predicted[index], tf.uint8)
+                downscale_factor = int(2**s)
+                name_target = 'Target_Downsampled_x' + str(downscale_factor)
+                name_pred = 'Blurred_Predicted_Downsampled_x' + \
+                    str(downscale_factor)
+                tf.summary.image(name_target, images_target, max_outputs=6)
+                tf.summary.image(name_pred, images_pred, max_outputs=6)
+
+            # Unblurred predicted output and argmax'd version of it
+            tf.summary.image('Soft_Output', tf.cast(self.soft_output,
+                                                    tf.uint8), max_outputs=6)
+            tf.summary.image('Hard_Output', tf.cast(self.hard_output,
+                                                    tf.uint8), max_outputs=6)
+
+            # Misc
+            tf.summary.scalar('Entropy', EntropyLayer(self.softmax))
+            tf.summary.scalar('Variance', VarianceLayer(self.softmax, num_bins=self.num_templates))
+            tf.summary.scalar('Temperature', self.temperature)
+
+            # Losses
+            tf.summary.scalar('Train_Loss', self.loss)
+            self.val_loss_summary = \
+                tf.summary.scalar('Validation_Loss', self.val_loss,
+                                  collections=['val'])
+            for i in range(len(self.loss_at_layer)):
+                loss = self.loss_at_layer[i]
+                loss_name = self.layers[i] + '_Loss'
+                tf.summary.scalar(loss_name, loss)
+
+            # Merge all summaries
             self.summaries = tf.summary.merge_all()
 
     def train(self):
