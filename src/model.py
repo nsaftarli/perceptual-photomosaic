@@ -109,147 +109,91 @@ class MosaicNet:
 
             return tf.concat([self.output_r, self.output_g, self.output_b], axis=3)
 
-    def perceptual_loss(self, target, predicted):
-        with tf.name_scope('Blurred_Predicted'):
-            self.blurred_predicted = GaussianBlurLayer(predicted, 'Blurred_Predicted',
-                                                       self.template_h, self.template_w)
+    def perceptual_loss(self, target, predicted, layers,
+                        layer_scale_factors, downscale_factors,
+                        blur_factors, blur_windows):
+        # Split user params
+        # Format:
+        #   layers = 'conv1_1,conv2_1,conv3_1,conv4_1,conv5_1'
+        #   layer_scale_factors = '1,0.5,0.25,0.125,0.03125'
+        #   downscale_factors ='0,1,2:0,1,2:0,1,2:0,1,2:0,1,2'
+        #   blur_factors = '3,3,3'  for blurring predicted at each scale
+        #   blur_windows = '8,8,8'  for blurring predicted at each scale
+        layers = layers.split(',')
+        layer_scale_factors = [float(s) for s in layer_scale_factors.split(',')]
+        downscale_factors = [s.split(',') for s in downscale_factors.split(':')]
+        downscale_factors = [[float(s) for s in arr]
+                             for arr in downscale_factors]
+        blur_factors = [float(s) for s in blur_factors.split(',')]
+        blur_windows = [float(s) for s in blur_windows.split(',')]
 
-        # Gaussian Pyramid
+        # Flatten downscale_factors and retrieve (ordered) unique values
+        # This will be used to construct the Gaussian Pyramid
+        scales = np.unique([item for sublist in downscale_factors
+                            for item in sublist])
+
+        # Construct Gaussian Pyramid
         with tf.name_scope('Gaussian_Pyramid'):
-            self.target_downsampled_x2 = GaussianBlurLayer(target, 'Target_Downsampled_x2',
-                                                      self.template_h, self.template_w, 2)
-            self.target_downsampled_x4 = GaussianBlurLayer(self.target_downsampled_x2, 'Target_Downsampled_x4',
-                                                      self.template_h, self.template_w, 2)
-            self.predicted_downsampled_x2 = GaussianBlurLayer(predicted, 'Predicted_Downsampled_x2',
-                                                         self.template_h, self.template_w, 2)
-            self.predicted_downsampled_x4 = GaussianBlurLayer(self.predicted_downsampled_x2, 'Predicted_Downsampled_x4',
-                                                         self.template_h, self.template_w, 2)
+            pyramid_predicted = [predicted]
+            pyramid_target = [target]
+            for s in scales[1:]:
+                downscale_factor = int(2**s)
 
-        # Get image features
-        target_feats = self.encoder
-        target_downsampled_x2_feats = VGG16(input=self.target_downsampled_x2)
-        target_downsampled_x4_feats = VGG16(input=self.target_downsampled_x4)
-        blurred_predicted_feats = VGG16(input=self.blurred_predicted)
-        predicted_downsampled_x2_feats = VGG16(input=self.predicted_downsampled_x2)
-        predicted_downsampled_x4_feats = VGG16(input=self.predicted_downsampled_x4)
+                predicted_name = 'Predicted_Downsampled_x' + \
+                    str(downscale_factor)
+                target_name = 'Target_Downsampled_x' + str(downscale_factor)
 
-        # Feature scale factors
-        target_conv1_1 = target_feats.conv1_1
-        conv1_1_shape = tf.cast(tf.shape(target_conv1_1), tf.float32)
-        conv1_1_scale = 1.0
-        target_conv2_1 = target_feats.conv2_1
-        conv2_1_shape = tf.cast(tf.shape(target_conv2_1), tf.float32)
-        conv2_1_scale = 0.5
-        target_conv3_1 = target_feats.conv3_1
-        conv3_1_shape = tf.cast(tf.shape(target_conv3_1), tf.float32)
-        conv3_1_scale = 0.25
-        target_conv4_1 = target_feats.conv4_1
-        conv4_1_shape = tf.cast(tf.shape(target_conv4_1), tf.float32)
-        conv4_1_scale = 0.125
-        target_conv5_1 = target_feats.conv5_1
-        conv5_1_shape = tf.cast(tf.shape(target_conv5_1), tf.float32)
-        conv5_1_scale = 0.03125
+                # sigma = sqrt(n / 4) where n is level in Pascal's triangle
+                sigma = (downscale_factor / 4.0)**0.5
+                k_h = downscale_factor + 1
+                k_w = k_h
 
-        # FEATURE RECONSTRUCTION LOSS
-        with tf.name_scope('Multi_Scale_MSE'):
-            with tf.name_scope('Original_Scale_MSE'):
-                self.conv1_1_loss = \
-                    tf.losses.mean_squared_error(
-                        target_feats.conv1_1,
-                        blurred_predicted_feats.conv1_1) * \
-                    conv1_1_scale
-                self.conv2_1_loss = \
-                    tf.losses.mean_squared_error(
-                        target_feats.conv2_1,
-                        blurred_predicted_feats.conv2_1) * \
-                    conv2_1_scale
-                self.conv3_1_loss = \
-                    tf.losses.mean_squared_error(
-                        target_feats.conv3_1,
-                        blurred_predicted_feats.conv3_1) * \
-                    conv3_1_scale
-                self.conv4_1_loss = \
-                    tf.losses.mean_squared_error(
-                        target_feats.conv4_1,
-                        blurred_predicted_feats.conv4_1) * \
-                    conv4_1_scale
-                self.conv5_1_loss = \
-                    tf.losses.mean_squared_error(
-                        target_feats.conv5_1,
-                        blurred_predicted_feats.conv5_1) * \
-                    conv5_1_scale
-                original_scale_losses = [self.conv1_1_loss, self.conv2_1_loss,
-                                         self.conv3_1_loss, self.conv4_1_loss,
-                                         self.conv5_1_loss]
+                predicted_at_curr_scale = \
+                    GaussianBlurLayer(predicted, predicted_name,
+                                      k_h=k_h, k_w=k_w,
+                                      stride=downscale_factor, sigma=sigma)
+                target_at_curr_scale = \
+                    GaussianBlurLayer(target, target_name,
+                                      k_h=k_h, k_w=k_w,
+                                      stride=downscale_factor, sigma=sigma)
 
-            with tf.name_scope('Downsampled_x2_MSE'):
-                downsampled_x2_conv1_1_loss = \
-                    tf.losses.mean_squared_error(
-                        target_downsampled_x2_feats.conv1_1,
-                        predicted_downsampled_x2_feats.conv1_1) * \
-                    (conv1_1_scale / 2)
-                downsampled_x2_conv2_1_loss = \
-                    tf.losses.mean_squared_error(
-                        target_downsampled_x2_feats.conv2_1,
-                        predicted_downsampled_x2_feats.conv2_1) * \
-                    (conv2_1_scale / 2)
-                downsampled_x2_conv3_1_loss = \
-                    tf.losses.mean_squared_error(
-                        target_downsampled_x2_feats.conv3_1,
-                        predicted_downsampled_x2_feats.conv3_1) * \
-                    (conv3_1_scale / 2)
-                downsampled_x2_conv4_1_loss = \
-                    tf.losses.mean_squared_error(
-                        target_downsampled_x2_feats.conv4_1,
-                        predicted_downsampled_x2_feats.conv4_1) * \
-                    (conv4_1_scale / 2)
-                downsampled_x2_conv5_1_loss = \
-                    tf.losses.mean_squared_error(
-                        target_downsampled_x2_feats.conv5_1,
-                        predicted_downsampled_x2_feats.conv5_1) * \
-                    (conv5_1_scale / 2)
-                downsampled_x2_losses = [downsampled_x2_conv1_1_loss,
-                                         downsampled_x2_conv2_1_loss,
-                                         downsampled_x2_conv3_1_loss,
-                                         downsampled_x2_conv4_1_loss,
-                                         downsampled_x2_conv5_1_loss]
+                # Append newly computed images at current scale to pyramid
+                pyramid_predicted.append(predicted_at_curr_scale)
+                pyramid_target.append(target_at_curr_scale)
 
-            with tf.name_scope('Downsampled_x4_MSE'):
-                downsampled_x4_conv1_1_loss = \
-                    tf.losses.mean_squared_error(
-                        target_downsampled_x4_feats.conv1_1,
-                        predicted_downsampled_x4_feats.conv1_1) * \
-                    (conv1_1_scale / 4)
-                downsampled_x4_conv2_1_loss = \
-                    tf.losses.mean_squared_error(
-                        target_downsampled_x4_feats.conv2_1,
-                        predicted_downsampled_x4_feats.conv2_1) * \
-                    (conv2_1_scale / 4)
-                downsampled_x4_conv3_1_loss = \
-                    tf.losses.mean_squared_error(
-                        target_downsampled_x4_feats.conv3_1,
-                        predicted_downsampled_x4_feats.conv3_1) * \
-                    (conv3_1_scale / 4)
-                downsampled_x4_conv4_1_loss = \
-                    tf.losses.mean_squared_error(
-                        target_downsampled_x4_feats.conv4_1,
-                        predicted_downsampled_x4_feats.conv4_1) * \
-                    (conv4_1_scale / 4)
-                downsampled_x4_conv5_1_loss = \
-                    tf.losses.mean_squared_error(
-                        target_downsampled_x4_feats.conv5_1,
-                        predicted_downsampled_x4_feats.conv5_1) * \
-                    (conv5_1_scale / 4)
-                downsampled_x4_losses = [downsampled_x4_conv1_1_loss,
-                                         downsampled_x4_conv2_1_loss,
-                                         downsampled_x4_conv3_1_loss,
-                                         downsampled_x4_conv4_1_loss,
-                                         downsampled_x4_conv5_1_loss]
+        # TODO: Blur each scale for predicted independently
 
-        return \
-            (tf.add_n(original_scale_losses) +
-            tf.add_n(downsampled_x2_losses) +
-            tf.add_n(downsampled_x4_losses)) / tf.to_float(self.batch_size)
+        # Get image features of predicted and target at each scale
+        pyramid_predicted_feats = []
+        pyramid_target_feats = []
+        for i in range(len(scales)):
+            predicted_feats = VGG16(input=pyramid_predicted[i])
+            target_feats = VGG16(input=pyramid_target[i])
+
+            # Append feats at this scale to pyramid of feats
+            pyramid_predicted_feats.append(predicted_feats)
+            pyramid_target_feats.append(target_feats)
+
+        # Compute feature reconstruction losses at each layer and pyramid scale
+        losses = []
+        i = 0
+        for scales_at_layer in downscale_factors:
+            layer = layers[i]
+            for scale in scales_at_layer:
+                predicted_layer = getattr(pyramid_predicted_feats[scale], layer)
+                target_layer = getattr(pyramid_target_feats[scale], layer)
+
+                # Append feature reconstruction loss
+                loss_layer = \
+                    tf.losses.mean_squared_error(target_layer, predicted_layer)
+
+                # Weight the loss
+                loss_layer *= layer_scale_factors[i]
+                losses.append(loss_layer)
+            i += 1
+
+        # Add all losses together and divide by batch size
+        return tf.add_n(losses) / tf.to_float(self.batch_size)
 
     def build_summaries(self):
         with tf.name_scope('Summaries'):
