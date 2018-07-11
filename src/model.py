@@ -166,8 +166,8 @@ class MosaicNet:
 
                 # sigma = sqrt(n / 4) where n is level in Pascal's triangle
                 sigma = (downscale_factor / 4.0)**0.5
-                k_h = downscale_factor + 1
-                k_w = k_h
+                k_h = int(downscale_factor + 1)
+                k_w = int(k_h)
 
                 predicted_at_curr_scale = \
                     GaussianBlurLayer(predicted, predicted_name,
@@ -189,7 +189,7 @@ class MosaicNet:
             # Blur each scale for predicted based on what user wants
             try:
                 blur_factor = blur_factors[i]
-                blur_window = blur_windows[i]
+                blur_window = int(blur_windows[i])
                 blurred_predicted_name = 'Blurred_Predicted_Downsampled_x' + \
                     str(int(2**scales[i]))
                 blurred_predicted = \
@@ -252,6 +252,9 @@ class MosaicNet:
             # Add together losses at all layers
             final_loss = tf.add_n(loss_at_layer)
 
+            # Average across number of layers used
+            final_loss /= len(layers)
+
         # For usage in summary
         self.losses = losses
         self.loss_at_layer = loss_at_layer
@@ -308,14 +311,17 @@ class MosaicNet:
             temperature = self.my_config['init_temperature']
             learning_rate = self.my_config['learning_rate']
 
-            temp_schedule = temperature_schedule(temperature, 15, 10,
-                                                 self.dataset.train_dataset_size,
-                                                 self.my_config['batch_size'])
+            temp_schedule, total_num_temp_updates = \
+                temperature_schedule(temperature, 15, 10,
+                                     self.dataset.train_dataset_size,
+                                     self.my_config['batch_size'])
 
+            num_temp_updates = 0
             for i in range(iterations_so_far, self.my_config['iterations']):
                 # Temperature Schedule (Linear)
-                if i % 10 == 0:
+                if i % 10 == 0 and num_temp_updates <= total_num_temp_updates:
                     temperature += temp_schedule
+                    num_temp_updates += 1
 
                 train_feed_dict = {self.learning_rate: learning_rate,
                                    self.temperature: temperature,
