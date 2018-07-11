@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def gauss2d_kernel(shape=(3, 3), sigma=0.5):
+def gauss2d_kernel(shape=(5, 5), sigma=1):
     """
     2D gaussian mask - should give the same result as MATLAB's
     fspecial('gaussian',[shape],[sigma])

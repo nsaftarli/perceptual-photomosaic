@@ -84,7 +84,22 @@ class MosaicNet:
                 self.soft_output = self.construct_output('Channel-wise_Soft_Output',
                                                          self.reshaped_softmax)
             with tf.name_scope('Perceptual_Loss'):
-                self.loss = self.perceptual_loss(self.input, self.soft_output)
+                # Gather user options for perceptual loss
+                layers = self.my_config['layers']
+                layer_scale_factors = self.my_config['layer_scale_factors']
+                downscale_factors = self.my_config['downscale_factors']
+                blur_factors = self.my_config['blur_factors']
+                blur_windows = self.my_config['blur_windows']
+
+                # Compute perceptual loss at chosen layers and scales
+                self.loss = \
+                    self.perceptual_loss(self.input, self.soft_output,
+                                         layers, layer_scale_factors,
+                                         downscale_factors, blur_factors,
+                                         blur_windows)
+
+                # Average loss over batch
+                self.loss = self.loss / tf.to_float(self.batch_size)
 
             self.build_summaries()
 
@@ -116,7 +131,7 @@ class MosaicNet:
         # Format:
         #   layers = 'conv1_1,conv2_1,conv3_1,conv4_1,conv5_1'
         #   layer_scale_factors = '1,0.5,0.25,0.125,0.03125'
-        #   downscale_factors ='0,1,2:0,1,2:0,1,2:0,1,2:0,1,2'
+        #   downscale_factors = '0,1,2:0,1,2:0,1,2:0,1,2:0,1,2'
         #   blur_factors = '3,3,3'  for blurring predicted at each scale
         #   blur_windows = '8,8,8'  for blurring predicted at each scale
         layers = layers.split(',')
@@ -134,9 +149,15 @@ class MosaicNet:
 
         # Construct Gaussian Pyramid
         with tf.name_scope('Gaussian_Pyramid'):
-            pyramid_predicted = [predicted]
-            pyramid_target = [target]
-            for s in scales[1:]:
+            pyramid_predicted = []
+            pyramid_target = []
+            for s in scales:
+                # Don't downsample if downscale factor is 0 (i.e., 2^0)
+                if s == 0:
+                    pyramid_predicted.append(predicted)
+                    pyramid_target.append(target)
+                    continue
+
                 downscale_factor = int(2**s)
 
                 predicted_name = 'Predicted_Downsampled_x' + \
@@ -161,12 +182,25 @@ class MosaicNet:
                 pyramid_predicted.append(predicted_at_curr_scale)
                 pyramid_target.append(target_at_curr_scale)
 
-        # TODO: Blur each scale for predicted independently
-
         # Get image features of predicted and target at each scale
         pyramid_predicted_feats = []
         pyramid_target_feats = []
         for i in range(len(scales)):
+            # Blur each scale for predicted based on what user wants
+            try:
+                blur_factor = blur_factors[i]
+                blur_window = blur_windows[i]
+                blurred_predicted_name = 'Blurred_Predicted_Downsampled_x' + \
+                    str(int(2**scales[i]))
+                blurred_predicted = \
+                    GaussianBlurLayer(pyramid_predicted[i],
+                                      blurred_predicted_name,
+                                      k_h=blur_window, k_w=blur_window,
+                                      stride=1, sigma=blur_factor)
+                pyramid_predicted[i] = blurred_predicted
+            except IndexError:
+                pass
+
             predicted_feats = VGG16(input=pyramid_predicted[i])
             target_feats = VGG16(input=pyramid_target[i])
 
@@ -179,21 +213,32 @@ class MosaicNet:
         i = 0
         for scales_at_layer in downscale_factors:
             layer = layers[i]
+            losses_at_layer = []
             for scale in scales_at_layer:
-                predicted_layer = getattr(pyramid_predicted_feats[scale], layer)
-                target_layer = getattr(pyramid_target_feats[scale], layer)
+                # Get index
+                index = np.where(scales == scale)[0][0]
+
+                predicted_layer = getattr(pyramid_predicted_feats[index], layer)
+                target_layer = getattr(pyramid_target_feats[index], layer)
 
                 # Append feature reconstruction loss
                 loss_layer = \
                     tf.losses.mean_squared_error(target_layer, predicted_layer)
+                losses_at_layer.append(loss_layer)
 
-                # Weight the loss
-                loss_layer *= layer_scale_factors[i]
-                losses.append(loss_layer)
+            # Add together losses at all scales in this layer
+            loss_at_layer = tf.add_n(loss_at_layer)
+
+            # Weight the loss at this layer and average across scales
+            loss_at_layer *= (layer_scale_factors[i] / len(scales_at_layer))
+
+            # Append to final losses list
+            losses.append(loss_at_layer)
+
             i += 1
 
-        # Add all losses together and divide by batch size
-        return tf.add_n(losses) / tf.to_float(self.batch_size)
+        # Add all losses together
+        return tf.add_n(losses)
 
     def build_summaries(self):
         with tf.name_scope('Summaries'):
