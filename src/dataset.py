@@ -37,7 +37,7 @@ class Dataset:
         self.train_dataset = self.train_dataset \
             .apply(shuffle_and_repeat(buffer_size=self.buffer_size,
                                       count=None)) \
-            .apply(map_and_batch(self.read_file, self.config['batch_size'],
+            .apply(map_and_batch(self.read_file, self.config['train_batch_size'],
                                  num_parallel_batches=self.num_cores)) \
             .prefetch(1)
         self.train_iterator = self.train_dataset.make_one_shot_iterator()
@@ -46,7 +46,7 @@ class Dataset:
     def get_validation_handle(self):
         map_and_batch = tf.contrib.data.map_and_batch
         self.val_dataset = self.val_dataset \
-            .apply(map_and_batch(self.read_file, self.config['batch_size'],
+            .apply(map_and_batch(self.read_file, self.config['val_batch_size'],
                                  num_parallel_batches=self.num_cores)) \
             .prefetch(1)
         self.val_iterator = self.val_dataset.make_initializable_iterator()
@@ -55,7 +55,7 @@ class Dataset:
     def get_prediction_handle(self):
         map_and_batch = tf.contrib.data.map_and_batch
         self.pred_dataset = self.pred_dataset \
-            .apply(map_and_batch(self.read_file, self.config['batch_size'],
+            .apply(map_and_batch(self.read_file, self.config['pred_batch_size'],
                                  num_parallel_batches=self.num_cores)) \
             .prefetch(1)
         self.pred_iterator = self.pred_dataset.make_initializable_iterator()
