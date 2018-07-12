@@ -299,6 +299,9 @@ class MosaicNet:
             tf.summary.scalar('Variance', VarianceLayer(self.softmax, num_bins=self.num_templates))
             tf.summary.scalar('Temperature', self.temperature)
 
+            # Softmax input
+            tf.summary.scalar('Softmax_Input', tf.reduce_mean(self.conv7))
+
             # Losses
             tf.summary.scalar('Train_Loss', self.loss)
             self.val_loss_summary = \
