@@ -9,7 +9,8 @@ def temperature_schedule(init_temperature,
 
     # Cap halfway through the epoch
     num_iters_per_half_epoch = num_iters_per_epoch / 2
-    num_temperature_updates = num_iters_per_half_epoch / update_freq
+    total_num_temperature_updates = num_iters_per_half_epoch / update_freq
 
-    increment_rate = (temperature_cap - init_temperature) / num_temperature_updates
-    return increment_rate
+    increment_rate = (temperature_cap - init_temperature) / \
+        total_num_temperature_updates
+    return increment_rate, total_num_temperature_updates

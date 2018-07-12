@@ -28,6 +28,18 @@ parser.add_argument('-mpath', '--model_path', default='data/models/MODEL_FOLDER/
 parser.add_argument('-ppath', '--predict_path', default='data/PREDICT_PATH', type=str)
 parser.add_argument('-folder', '--template_folder', default='black_ascii_8', type=str)
 parser.add_argument('-id', '--run_id', default=time.strftime('%d%b-%X'), type=str)
+
+# FOR PERCEPTUAL LOSS
+parser.add_argument('-ls', '--layers',
+                    default='conv1_1,conv2_1,conv3_1,conv4_1,conv5_1', type=str)
+parser.add_argument('-lsf', '--layer_scale_factors',
+                    default='1,1,1,1,1', type=str)
+parser.add_argument('-dsf', '--downscale_factors',
+                    default='0,1,2:0,1,2:0,1,2:0,1,2:0,1,2', type=str)
+parser.add_argument('-bf', '--blur_factors', default='3,3,3', type=str)
+parser.add_argument('-bw', '--blur_windows', default='8,8,8', type=str)
+
+# Parse arguments
 args = parser.parse_args()
 
 # SETTINGS
@@ -45,6 +57,12 @@ my_config['log_freq'] = args.log_freq
 my_config['run_id'] = args.run_id
 my_config['iterations'] = args.iterations
 
+# FOR PERCEPTUAL LOSS
+my_config['layers'] = args.layers
+my_config['layer_scale_factors'] = args.layer_scale_factors
+my_config['downscale_factors'] = args.downscale_factors
+my_config['blur_factors'] = args.blur_factors
+my_config['blur_windows'] = args.blur_windows
 
 # For Simplicity
 gpu = args.gpu
