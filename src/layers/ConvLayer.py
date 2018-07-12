@@ -1,5 +1,5 @@
 import tensorflow as tf
-from src.layers.NormalizationLayers import GroupNormLayer
+from src.layers.NormalizationLayers import LayerNormLayer
 
 
 def ConvLayer(input, name, out_channels, ksize=3, stride=1, activation='relu', trainable=True):

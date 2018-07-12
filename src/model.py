@@ -300,7 +300,8 @@ class MosaicNet:
             tf.summary.scalar('Temperature', self.temperature)
 
             # Softmax input
-            tf.summary.scalar('Softmax_Input', tf.reduce_mean(self.conv7))
+            tf.summary.scalar('Conv6', tf.reduce_mean(self.conv6))
+            tf.summary.scalar('Softmax_Input_(Conv7)', tf.reduce_mean(self.conv7))
 
             # Losses
             tf.summary.scalar('Train_Loss', self.loss)
