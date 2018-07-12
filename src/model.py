@@ -24,7 +24,6 @@ class MosaicNet:
         # GRAPH INPUTS
         with tf.name_scope('Graph_Inputs'):
             self.temperature = tf.placeholder(tf.float32, shape=[])
-            self.learning_rate = tf.placeholder(tf.float32, shape=[])
             self.val_loss = tf.placeholder(tf.float32, shape=[])
             self.next_batch = self.dataset.iterator.get_next()
             self.input = self.next_batch[0]
@@ -317,7 +316,10 @@ class MosaicNet:
             self.summaries = tf.summary.merge_all()
 
     def train(self):
-        opt = tf.train.MomentumOptimizer(self.learning_rate, momentum=0.9)
+        global_step = tf.Variable(0, trainable=False)
+        learning_rate = tf.train.exponential_decay(self.my_config['learning_rate'],
+                                                   global_step, 100, 0.96, staircase=True)
+        opt = tf.train.AdamOptimizer(learning_rate)
         train_step = opt.minimize(self.loss)
 
         saver = tf.train.Saver(max_to_keep=0, pad_step_number=16)
@@ -340,7 +342,6 @@ class MosaicNet:
             train_handle = sess.run(self.dataset.get_training_handle())
             val_handle = sess.run(self.dataset.get_validation_handle())
             temperature = self.my_config['init_temperature']
-            learning_rate = self.my_config['learning_rate']
 
             temp_schedule, total_num_temp_updates = \
                 temperature_schedule(temperature, 15, 10,
@@ -354,7 +355,7 @@ class MosaicNet:
                     temperature += temp_schedule
                     num_temp_updates += 1
 
-                train_feed_dict = {self.learning_rate: learning_rate,
+                train_feed_dict = {global_step: i,
                                    self.temperature: temperature,
                                    self.dataset.handle: train_handle}
                 results = sess.run([train_step, self.loss, self.summaries],
