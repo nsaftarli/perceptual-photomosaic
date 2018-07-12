@@ -3,13 +3,13 @@ import tensorflow as tf
 
 def InstanceNormLayer(input, name, epsilon=1e-12):
     with tf.name_scope(name):
-        mean, var = tf.nn.moments(input, axes=[1, 2, 3])
+        mean, var = tf.nn.moments(input, axes=[1, 2])
         return (input - mean) / (tf.sqrt(var+epsilon))
 
 
 def LayerNormLayer(input, name, eps=1e-12):
     with tf.name_scope(name):
-        mean, var = tf.nn.moments(input, axes=[0, 1, 2])
+        mean, var = tf.nn.moments(input, axes=[1, 2, 3])
         return (input-mean)/tf.sqrt(var+eps)
 
 
